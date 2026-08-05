@@ -301,6 +301,51 @@ You can also specify whether the fields are presets or generated or both, using 
 `autosource=generator`, or `autosource=both`.
 [Give it a try](https://anvaka.github.io/fieldplay/?autotime=30s&autosource=both)!
 
+## Wallpaper Mode
+
+Wallpaper mode is a full-screen, UI-free mode intended for URL wallpapers such as Lively Wallpaper. It leaves the normal editor and the existing Auto Mode unchanged.
+
+```text
+http://localhost:8880/?wallpaper=1&interval=10m&source=curated&quality=auto&maxparticles=70000
+https://YOUR-USERNAME.github.io/fieldplay/?wallpaper=1&interval=10m&source=curated&quality=auto&maxparticles=70000
+```
+
+Supported parameters:
+
+| Parameter | Values | Default |
+| --- | --- | --- |
+| `wallpaper` | `1` enables wallpaper mode | disabled |
+| `interval` | duration with `ms`, `s`, `m`, or `h` (minimum 30 seconds) | `10m` |
+| `source` | `curated`, `presets`, `generator`, `mixed` | `curated` |
+| `quality` | `auto`, `low`, `medium`, `high`, `ultra` | `auto` |
+| `maxparticles` | safe range of 5,000–100,000 | `70000` |
+| `transition` | `fade`, `none` | `fade` |
+| `debug` | `1`, `0` | `0` |
+| `seed` | any string, for a reproducible starting field | none |
+
+`source=curated` selects from 24 bounded, parameterized GLSL field families. Seeds make a field reproducible, while normal loads use a fresh seed. The last 24 compact field identifiers are stored in local storage; exact recent fields are not restored, and the curated selector avoids the immediately previous family.
+
+`quality=auto` begins at 35,000 particles and samples rolling FPS. It reduces sustained performance below 42 FPS and increases sustained performance above 57 FPS, with a five-second cooldown. Fixed presets use approximately 12k, 25k, 45k, and 70k particles for low through ultra. Adaptive sampling and field timers pause when the document is hidden.
+
+Wallpaper-only keyboard controls:
+
+| Key | Action |
+| --- | --- |
+| `N` or Right Arrow | next field |
+| `P` or Left Arrow | previous field, when available |
+| Space | pause/resume cycling |
+| `R` | regenerate the current curated family |
+| `D` | show/hide diagnostics |
+
+### Lively Wallpaper
+
+1. Deploy your fork to GitHub Pages.
+2. In Lively Wallpaper, choose **Add Wallpaper** and add a wallpaper from URL.
+3. Paste the wallpaper-mode URL above, replacing `YOUR-USERNAME`.
+4. In Lively settings, enable pausing wallpapers while fullscreen apps or games are active.
+
+This mode was designed for modern WebGL-capable browsers and tested as a URL wallpaper workflow; it does not claim support for other wallpaper applications or operating systems.
+
 # Local development
 
 Clone this repository, then:

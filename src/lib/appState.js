@@ -20,6 +20,7 @@ var qs = queryState({}, {
 });
 
 var currentState = qs.get();
+var isWallpaperSession = currentState.wallpaper === 1 || currentState.wallpaper === '1';
 
 var defaultVectorField = wrapVectorField(`v.x = 0.1 * p.y;
   v.y = -0.2 * p.y;`);
@@ -77,6 +78,7 @@ function getColorMode() {
 
 function setColorMode(colorMode) {
   if (!defined(colorMode)) return;
+  if (isWallpaperSession) return;
   qs.set({cm: colorMode});
   currentState.cm = colorMode;
 }
@@ -87,6 +89,7 @@ function getColorFunction() {
 }
 
 function setColorFunction(colorFunction) {
+  if (isWallpaperSession) return;
   qs.set({cf: colorFunction});
   currentState.cf = colorFunction;
 }
@@ -98,6 +101,7 @@ function getFadeout() {
 
 function setFadeout(fadeout) {
   if (!defined(fadeout)) return;
+  if (isWallpaperSession) return;
   qs.set({fo: fadeout});
   currentState.fo = fadeout;
 }
@@ -109,6 +113,7 @@ function getParticleCount() {
 
 function setParticleCount(particleCount) {
   if (!defined(particleCount)) return;
+  if (isWallpaperSession) return;
   qs.set({pc: particleCount});
   currentState.pc = particleCount;
 }
@@ -120,6 +125,7 @@ function getIntegrationTimeStep() {
 
 function setIntegrationTimeStep(dt) {
   if (!defined(dt)) return;
+  if (isWallpaperSession) return;
   qs.set({dt: dt})
   currentState.dt = dt;
 }
@@ -131,6 +137,7 @@ function getDropProbability() {
 
 function setDropProbability(dropProbability) {
   if (!defined(dropProbability)) return;
+  if (isWallpaperSession) return;
   clamp(dropProbability, 0, 1);
   qs.set({dp: dropProbability})
 }
@@ -159,6 +166,7 @@ function makeBBox(cx, cy, w, h) {
 }
 
 function saveBBox(bbox, immediate = false) {
+  if (isWallpaperSession) return;
   bbox = {
     cx: (bbox.minX + bbox.maxX) * 0.5,
     cy: (bbox.minY + bbox.maxY) * 0.5,
@@ -211,6 +219,7 @@ function getDefaultCode() {
 }
 
 function saveCode(code) {
+  if (isWallpaperSession) return;
   qs.set({
     vf: code
   });

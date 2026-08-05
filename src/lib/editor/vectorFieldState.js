@@ -44,18 +44,18 @@ export default function createVectorFieldEditorState(drawProgram) {
     return appState.getCode();
   }
 
-  function setCode(vectorFieldCode) {
+  function setCode(vectorFieldCode, options = {}) {
     if (vectorFieldCode === currentVectorFieldCode) {
       // If field hasn't changed, let's make sure that there was no previous
       // error
       if (parserResult && parserResult.error) {
         // And if there was error, let's revalidate code:
-        parseCode();
+        return parseCode();
       }
-      return;
+      return Promise.resolve(parserResult || { code: currentVectorFieldCode });
     } 
 
-    trySetNewCode(vectorFieldCode).then((result) => {
+    return trySetNewCode(vectorFieldCode).then((result) => {
       if (result.cancelled) return;
 
       if (result && result.error) {
@@ -65,7 +65,8 @@ export default function createVectorFieldEditorState(drawProgram) {
 
       currentVectorFieldCode = vectorFieldCode;
       api.code = vectorFieldCode;
-      appState.saveCode(vectorFieldCode);
+      if (options.persist !== false) appState.saveCode(vectorFieldCode);
+      return result;
     });
   }
 

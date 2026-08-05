@@ -44,6 +44,7 @@ export default {
   mounted() {
     this.scene = window.scene;
     bus.fire('scene-ready', window.scene);
+    if (this.hideUI) return;
     this.updateControlsStyle = this.updateControlsStyle.bind(this);
     window.addEventListener('resize', this.updateControlsStyle, true);
 
@@ -53,7 +54,7 @@ export default {
     });
   },
   beforeUnmount() {
-    this.resizer.dispose();
+    if (this.resizer) this.resizer.dispose();
     window.removeEventListener('resize', this.updateControlsStyle, true);
     if (this.scene) {
       this.scene.dispose();
@@ -66,7 +67,7 @@ export default {
       width: MIN_SETTINGS_WIDTH,
       webGLEnabled: window.webGLEnabled,
       aboutVisible: false,
-      hideUI: appState.getQS().get('ui') === 0,
+      hideUI: appState.getQS().get('ui') === 0 || appState.getQS().get('wallpaper') === 1,
       vectorLinesEnabled: config.vectorLinesEnabled
     };
   },
@@ -85,6 +86,7 @@ export default {
       return {width: this.width + 'px'};
     },
     updateControlsStyle() {
+      if (!this.$refs.controls) return;
       this.$refs.controls.style.width = this.getControlsContainerStyle().width;
     }
   }
