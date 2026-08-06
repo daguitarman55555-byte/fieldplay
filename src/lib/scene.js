@@ -110,6 +110,9 @@ export default function initScene(gl) {
   // Frame management
   var lastAnimationFrame;
   var isPaused = false;
+  var lastFrameError = null;
+  var frameListeners = new Set();
+  var suppressStateSaving = false;
 
   var inputsModel = createInputsModel(ctx);
 
@@ -132,6 +135,9 @@ export default function initScene(gl) {
     applyBoundingBox,
 
     setPaused,
+    onFrame,
+    getFrameCount: () => ctx.frame,
+    getLastFrameError: () => lastFrameError,
 
     getParticlesCount,
     setParticlesCount,
@@ -211,26 +217,27 @@ export default function initScene(gl) {
     currentCapturer = null;
   }
 
-  function setColorMode(x) {
+  function setColorMode(x, options = {}) {
     var mode = parseInt(x, 10);
-    appState.setColorMode(mode);
-    ctx.colorMode = appState.getColorMode();
+    if (!Number.isFinite(mode)) return;
+    if (options.persist !== false) appState.setColorMode(mode);
+    ctx.colorMode = mode;
     drawProgram.updateColorMode(mode);
   }
 
   function getColorMode() {
-    return appState.getColorMode();
+    return ctx.colorMode;
   }
 
   function getIntegrationTimeStep() {
-    return appState.getIntegrationTimeStep();
+    return ctx.integrationTimeStep;
   }
 
-  function setIntegrationTimeStep(x) {
+  function setIntegrationTimeStep(x, options = {}) {
     var f = parseFloat(x);
     if (Number.isFinite(f)) {
       ctx.integrationTimeStep = f;
-      appState.setIntegrationTimeStep(f);
+      if (options.persist !== false) appState.setIntegrationTimeStep(f);
       bus.fire('integration-timestep-changed', f);
     }
   }
@@ -241,24 +248,24 @@ export default function initScene(gl) {
   }
 
   // Main screen fade out configuration
-  function setFadeOutSpeed(x) {
+  function setFadeOutSpeed(x, options = {}) {
     var f = parseFloat(x);
     if (Number.isFinite(f)) {
       ctx.fadeOpacity = f;
-      appState.setFadeout(f);
+      if (options.persist !== false) appState.setFadeout(f);
     }
   }
 
   function getFadeOutSpeed() {
-    return appState.getFadeout();
+    return ctx.fadeOpacity;
   }
 
   // Number of particles configuration
   function getParticlesCount() {
-    return appState.getParticleCount();
+    return particleCount;
   }
 
-  function setParticlesCount(newParticleCount) {
+  function setParticlesCount(newParticleCount, options = {}) {
     if (!Number.isFinite(newParticleCount)) return;
     if (newParticleCount === particleCount) return;
     if (newParticleCount < 1) return;
@@ -266,21 +273,20 @@ export default function initScene(gl) {
     updateParticlesCount(newParticleCount);
 
     particleCount = newParticleCount;
-    appState.setParticleCount(newParticleCount);
+    if (options.persist !== false) appState.setParticleCount(newParticleCount);
   }
 
   // drop probability
-  function setDropProbability(x) {
+  function setDropProbability(x, options = {}) {
     var f = parseFloat(x);
     if (Number.isFinite(f)) {
-      // TODO: Do I need to worry about duplication/clamping?
-      appState.setDropProbability(f);
+      if (options.persist !== false) appState.setDropProbability(f);
       ctx.dropProbability = f;
     }
   }
 
   function getDropProbability() {
-    return appState.getDropProbability();
+    return ctx.dropProbability;
   }
 
   function onResize() {
@@ -313,6 +319,7 @@ export default function initScene(gl) {
       window.removeEventListener('resize', onResize, true);
       cursorUpdater.dispose();
       vectorFieldEditorState.dispose();
+      frameListeners.clear();
   }
 
   function nextFrame() {
@@ -331,7 +338,16 @@ export default function initScene(gl) {
   function draw() {
     lastAnimationFrame = 0;
 
-    drawScreen();
+    try {
+      drawScreen();
+      lastFrameError = null;
+      var frameInfo = { time: performance.now(), frame: ctx.frame };
+      frameListeners.forEach(listener => listener(frameInfo));
+    } catch (error) {
+      lastFrameError = error && error.message ? error.message : 'WebGL rendering failed';
+      isPaused = true;
+      return;
+    }
 
     if (currentCapturer) currentCapturer.capture(gl.canvas);
 
@@ -409,7 +425,7 @@ export default function initScene(gl) {
     bbox.maxY = Math.round(p * -maxY/ width)/p;
 
 
-    appState.saveBBox(bbox);
+    if (!suppressStateSaving) appState.saveBBox(bbox);
 
     bus.fire('bbox-change', bbox);
 
@@ -434,10 +450,17 @@ export default function initScene(gl) {
     })
   }
 
-  function applyBoundingBox(boundingBox) {
-    appState.saveBBox(boundingBox);
+  function applyBoundingBox(boundingBox, options = {}) {
+    suppressStateSaving = options.persist === false;
+    if (!suppressStateSaving) appState.saveBBox(boundingBox);
     restoreBBox();
     // a hack to trigger panzoom event
     panzoom.moveBy(0, 0, false);
+    suppressStateSaving = false;
+  }
+
+  function onFrame(listener) {
+    frameListeners.add(listener);
+    return () => frameListeners.delete(listener);
   }
 }

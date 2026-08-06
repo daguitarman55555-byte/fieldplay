@@ -7,6 +7,8 @@
 import initScene from './scene';
 import bus from './bus';
 import { initAutoMode } from './autoMode';
+import { createWallpaperMode } from './wallpaper';
+import { parseWallpaperOptions } from './wallpaper/parseWallpaperOptions';
 
 var canvas = document.getElementById('scene');
 // Canvas may not be available in test run
@@ -27,8 +29,16 @@ function initVectorFieldApp(canvas) {
     window.webGLEnabled = true;
     var scene = initScene(gl);
     scene.start();
-    initAutoMode(scene);
     window.scene = scene;
+    const wallpaperOptions = parseWallpaperOptions();
+    if (wallpaperOptions.enabled) {
+      document.body.classList.add('wallpaper-mode');
+      canvas.style.pointerEvents = 'none';
+      window.wallpaper = createWallpaperMode({ scene, options: wallpaperOptions });
+      window.wallpaper.start();
+    } else {
+      initAutoMode(scene);
+    }
   } else {
     window.webGLEnabled = false;
   }

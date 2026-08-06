@@ -1016,5 +1016,27 @@ v.y = A*sin(w*t/d);
   return v;
 }`,
     "particleCount": 3000
+  },
+  {
+    "name": "Sine cascade",
+    "timeStep": 0.01,
+    "fadeOut": 0.998,
+    "dropProbability": 0.009,
+    "colorMode": 3,
+    "cx": 4.09005,
+    "cy": 0.07504999999999995,
+    "w": 8.5445,
+    "h": 8.5445,
+    "code": `// p.x and p.y are current coordinates
+// v.x and v.y is a velocity at point p
+vec2 get_velocity(vec2 p) {
+  vec2 v = vec2(0., 0.);
+
+  // change this to get a new vector field
+  v.x = p.y;
+  v.y = cos((length(p)-pow(p.x, length(p)/sin(p.y*min(p.x,p.y)))));
+
+  return v;
+}`
   }
 ];
