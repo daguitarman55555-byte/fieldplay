@@ -165,6 +165,11 @@ export default {
     bus.on('scene-ready', this.onSceneReady, this);
     bus.on('bbox-change', this.updateBBox, this);
 
+    // The renderer starts before Vue is lazy-loaded. Initialize immediately
+    // when the scene already exists instead of relying on an event that may
+    // have fired before this component mounted.
+    if (this.scene) this.onSceneReady(this.scene);
+
     if (soundAvailable) this.soundLoader = new SoundLoader(this.$refs.player);
   },
   beforeUnmount() {
@@ -308,7 +313,7 @@ export default {
 
     updateBBox() {
       this.ignoreBbox = true;
-      var bbox = scene.getBoundingBox();
+      var bbox = this.scene.getBoundingBox();
       this.minX = bbox.minX;
       this.maxX = bbox.maxX;
 
