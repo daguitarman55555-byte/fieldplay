@@ -15,15 +15,12 @@
       <field-overlay :scene='scene'></field-overlay>
       <studio-status :scene='scene'></studio-status>
       <div class='controls-container' :style='getControlsContainerStyle()' ref='controls'>
-        <header class='studio-header'>
-          <div><strong>FieldPlay</strong><span>Studio</span></div>
-          <button @click='aboutVisible = !aboutVisible' title='About FieldPlay'>?</button>
-        </header>
         <controls></controls>
         <settings :scene='scene'></settings>
         <div ref='left' class='left resize'></div>
       </div>
       <share></share>
+      <a href='#' @click.prevent='aboutVisible = !aboutVisible' class='about-link'>about...</a>
       <about @close='aboutVisible = false' v-if='aboutVisible'></about>
     </div>
   </div>
@@ -117,41 +114,34 @@ export default {
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 
   border: 1px solid primary-border;
-  border-right: none;
+  border-left: none;
   border-top: none;
   overflow: hidden;
   flex-direction: column;
   display: flex;
-  right: 0;
+  left: 0;
   backdrop-filter: blur(18px);
 
   .settings {
     flex: 1;
   }
 }
-.studio-header {
-  height: 58px;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: white;
-  background: rgba(3, 10, 23, .96);
-  border-bottom: 1px solid #21334b;
-  strong { font-size: 20px; letter-spacing: -.4px; }
-  span { color: #58b9ff; margin-left: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; }
-  button { border: 1px solid #344b68; color: #9ec8ed; background: transparent; width: 28px; height: 28px; cursor: pointer; }
-}
 .resize {
   position: absolute;
 }
 .resize.left {
-  left: -2px;
+  right: -2px;
   height: 100%;
   width: 4px;
   cursor: ew-resize;
   background: transparent;
   top: 0;
+}
+.about-link {
+  position: absolute;
+  z-index: 9;
+  left: 7px;
+  bottom: 7px;
 }
 
 a {

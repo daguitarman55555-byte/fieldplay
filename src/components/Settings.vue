@@ -1,6 +1,5 @@
 <template>
   <div class='settings' :class='{collapsed: settingsPanel.collapsed}'>
-    <nav class='panel-jump' aria-label='Settings sections'><a href='#field-definition'>Field</a><a href='#visual-layers'>Layers</a><a href='#simulation'>Simulation</a><a href='#viewport'>View</a><a href='#projects'>Projects</a></nav>
     <div id='field-definition' class='block vector-field panel-section' v-if='vectorField'>
       <div class='title'>Vector field <a class='reset-all' :class='{"syntax-visible": syntaxHelpVisible}' href='#' @click.prevent='syntaxHelpVisible = !syntaxHelpVisible'>Syntax</a></div>
       <div class='math-editor'>
@@ -17,10 +16,10 @@
       </div>
       <syntax v-if='syntaxHelpVisible' @close='syntaxHelpVisible = false'></syntax>
       <details class='function-database'><summary>Function reference ({{functionDatabase.length}})</summary><p class='function-list'>{{functionDatabase.join(', ')}}</p><dl><template v-for='(description,name) in functionHelp' :key='name'><dt>{{name}}</dt><dd>{{description}}</dd></template></dl><p>Variables: x, y, r, theta, t. Constants: π/pi, e, tau, phi, sqrt2, ln2, ln10.</p></details>
-      <details class='advanced-code'><summary>Developer mode — advanced GLSL</summary>
+      <details class='advanced-code' open><summary>Developer mode — advanced GLSL</summary>
       <code-editor :model='vectorField'></code-editor>
       </details>
-      <details class='preset-library'><summary>Field preset gallery ({{presets.length}})</summary>
+      <details class='preset-library' open><summary>Field preset gallery ({{presets.length}})</summary>
         <input class='preset-search' v-model='presetSearch' placeholder='Search field presets'>
         <div class='preset-grid'><div class='preset-card' v-for='preset in filteredPresets' :key='preset.name'><button @click='applyPreset(preset)'>{{preset.name}}</button><button class='favorite' @click='toggleFavorite(preset.name)' :title='isFavorite(preset.name)?`Remove favorite`:`Add favorite`'>{{isFavorite(preset.name)?'★':'☆'}}</button></div></div>
       </details>
@@ -189,7 +188,7 @@
         </div>
       </div>
     </form>
-    <details id='projects' class='project-panel panel-section'>
+    <details id='projects' class='project-panel panel-section' open>
       <summary class='title'>Projects and history</summary>
       <div class='history-buttons'><button @click='undo'>Undo</button><button @click='redo'>Redo</button><button @click='downloadPNG'>PNG</button><button @click='downloadSVG'>SVG</button></div>
       <div class='save-project'><input v-model='projectName' placeholder='Project name'><button @click='saveCurrentProject'>Save</button></div>
@@ -198,7 +197,7 @@
       <button v-if='comparisonActive' @click='clearComparison'>Clear comparison</button>
       <label v-if='comparisonActive'>Comparison <select v-model='overlay.compareMode' @change='publishOverlay'><option value='overlay'>Overlay</option><option value='difference'>Difference</option><option value='split'>Split view</option></select></label>
     </details>
-    <details class='export-panel panel-section'>
+    <details class='export-panel panel-section' open>
       <summary class='title'>Share and export</summary>
       <p>The current field and viewport already live in the URL. Copy it to share an exact scene.</p>
       <button @click='copyShareLink'>{{copyLabel}}</button>
@@ -521,9 +520,6 @@ help-background = rgb(7, 12, 23);
   width: 100%;
   padding: 7px 7px 7px 7px;
 }
-.panel-jump { position:sticky;top:-7px;z-index:8;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:-7px -7px 10px;padding:7px;background:rgba(3,10,23,.98);border-bottom:1px solid #21334b; }
-.panel-jump a { padding:7px 2px;color:#8fb8dc;text-align:center;text-decoration:none;font-size:11px;border:1px solid transparent;border-radius:3px; }
-.panel-jump a:hover,.panel-jump a:focus { color:white;background:#10263d;border-color:#365875; }
 .panel-section { scroll-margin-top:46px; }
 .panel-subsection { scroll-margin-top:52px; }
 .section-heading { margin:20px 0 10px;padding:11px 12px;border-left:3px solid #42aaf5;background:linear-gradient(90deg,#0a1c30,transparent);scroll-margin-top:52px; }
