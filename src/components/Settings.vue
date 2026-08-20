@@ -67,7 +67,9 @@
         <label v-for='item in overlayToggles' :key='item.key'><input type='checkbox' v-model='overlay[item.key]' @change='publishOverlay'> {{item.label}}</label>
         <label class='range-label'>Arrow density <input type='range' min='8' max='42' v-model.number='overlay.arrowDensity' @input='publishOverlay'></label>
         <label class='range-label'>Overlay opacity <input type='range' min='.15' max='1' step='.05' v-model.number='overlay.opacity' @input='publishOverlay'></label>
-        <label>Arrow colors <select v-model='overlay.palette' @change='publishOverlay'><option value='magnitude'>Magnitude</option><option value='cyan'>Cyan</option><option value='violet'>Violet</option><option value='gold'>Gold</option><option value='white'>White</option></select></label>
+        <label>Arrow colors <select v-model='overlay.palette' @change='publishOverlay'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option></select></label>
+        <label class='match-colors'><input type='checkbox' v-model='overlay.matchParticles' @change='publishOverlay'> Match particle colors</label>
+        <label v-if='overlay.contours' class='range-label'>Contour quantity <select v-model='overlay.contourQuantity' @change='publishOverlay'><option value='magnitude'>Vector magnitude |F|</option><option value='divergence'>Divergence ∇·F</option><option value='curl'>2D curl</option><option value='potential'>Scalar potential f</option></select></label>
       </div>
       <div class='row' v-if='soundAvailable'>
         <audio ref='player' controls='' autoplay='' preload autobuffer></audio>
@@ -130,11 +132,13 @@
       </div>
       <div class='studio-simulation-controls'>
         <div class='title small'>Numerical engine and style</div>
+        <label>Performance <select v-model='performanceProfile' @change='applyPerformanceProfile'><option value='eco'>Eco</option><option value='balanced'>Balanced</option><option value='detail'>High detail</option><option value='custom'>Custom</option></select></label>
         <label>Integrator <select v-model='integrator' @change='applySimulation'><option value='euler'>Euler</option><option value='midpoint'>Midpoint (RK2)</option><option value='rk4'>Runge–Kutta 4</option></select></label>
         <label>Speed <input type='range' min='0' max='4' step='.05' v-model.number='speedMultiplier' @input='applySimulation'><output>{{speedMultiplier.toFixed(2)}}×</output></label>
         <label>Particle size <input type='range' min='1' max='8' step='.25' v-model.number='particleSize' @input='applyParticleStyle'><output>{{particleSize}} px</output></label>
         <label>Particle opacity <input type='range' min='.05' max='1' step='.05' v-model.number='particleOpacity' @input='applyParticleStyle'><output>{{particleOpacity}}</output></label>
-        <label>Particle color <input type='color' v-model='particleColor' @input='applyParticleColor'></label>
+        <label>Particle palette <select v-model='particlePalette' @change='applyParticlePalette'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option><option value='custom'>Custom color</option></select></label>
+        <label v-if='particlePalette===`custom`'>Custom particle color <input type='color' v-model='particleColor' @input='applyParticleColor'></label>
         <label>Background <input type='color' v-model='backgroundColor' @input='applyBackground'></label>
         <label>Seed <input type='number' v-model.number='seed' @change='applySpawn'></label>
         <label>Spawn <select v-model='spawnMode' @change='applySpawn'><option value='random'>Random</option><option value='grid'>Grid</option><option value='ring'>Ring</option></select></label>
@@ -235,9 +239,10 @@ export default {
       parameterText: '',
       parameterValues: {},
       mathError: '',
-      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.82,palette:'magnitude'},
-      overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Scalar contours (∇f)'},{key:'critical',label:'Critical points'}],
-      integrator:'rk4',speedMultiplier:1,particleSize:1.5,particleOpacity:1,particleColor:'#4ec4ff',backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.82,palette:'magnitude',matchParticles:false,contourQuantity:'magnitude',particlePalette:'cyan',particleColor:'#4ec4ff'},
+      overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Contour lines'},{key:'critical',label:'Critical points'}],
+      colorPalettes:[{value:'magnitude',label:'Magnitude (blue → red)'},{value:'cyan',label:'Cyan'},{value:'blue',label:'Blue'},{value:'teal',label:'Teal'},{value:'green',label:'Green'},{value:'gold',label:'Gold'},{value:'orange',label:'Orange'},{value:'red',label:'Red'},{value:'pink',label:'Pink'},{value:'violet',label:'Violet'},{value:'white',label:'White'},{value:'rainbow',label:'Direction rainbow'}],
+      integrator:'rk4',speedMultiplier:1,performanceProfile:'balanced',particleSize:1.5,particleOpacity:1,particlePalette:'cyan',particleColor:'#4ec4ff',backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,
       history:createHistory(),projectName:'My field',savedProjects:listProjects(),comparisonActive:false,restoring:false,
       soundCloudLink: 'https://soundcloud.com/mrfijiwiji/yours-truly',
       vectorField: null,
@@ -278,6 +283,7 @@ export default {
       this.scene.setDropProbability(newValue);
     },
     selectedColorMode(newValue) {
+      if(Number(newValue)===4){if(this.scene)this.applyParticlePalette();return;}
       this.scene.setColorMode(newValue);
     },
     'vectorField.code'(newCode) {
@@ -330,13 +336,15 @@ export default {
     updateParameter(name,value){this.parameterValues[name]=Number(value);this.parameterText=Object.entries(this.parameterValues).map(([key,val])=>`${key}=${val}`).join(', ');this.applyMathField();},
     publishOverlay(){bus.fire('studio-overlay-options',{...this.overlay});this.queuePersist();},
     applySimulation(){this.scene.setIntegrator(this.integrator);this.scene.setSpeedMultiplier(this.speedMultiplier);this.queuePersist();},
+    applyPerformanceProfile(){const profiles={eco:{particles:12000,integrator:'midpoint',density:14},balanced:{particles:25000,integrator:'rk4',density:22},detail:{particles:50000,integrator:'rk4',density:30}},profile=profiles[this.performanceProfile];if(!profile)return;this.particlesCount=profile.particles;this.integrator=profile.integrator;this.overlay.arrowDensity=profile.density;this.applySimulation();this.publishOverlay();},
     applySpawn(){this.scene.setSeed(this.seed);this.scene.setSpawnMode(this.spawnMode);this.persistStudioState();},
     applyParticleStyle(){this.scene.setParticleStyle({size:this.particleSize,opacity:this.particleOpacity});this.queuePersist();},
-    applyParticleColor(){const {r,g,b}=hexColor(this.particleColor);this.selectedColorMode=4;this.scene.setColorFunction(`vec4 get_color(vec2 p) { return vec4(${r.toFixed(4)}, ${g.toFixed(4)}, ${b.toFixed(4)}, 1.0); }`);this.queuePersist();},
+    applyParticlePalette(){if(this.particlePalette==='custom')return this.applyParticleColor();if(this.particlePalette==='magnitude'){this.selectedColorMode=2;this.scene.setColorMode(2);}else if(this.particlePalette==='rainbow'){this.selectedColorMode=3;this.scene.setColorMode(3);}else{this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader(this.particlePalette,this.particleColor));}this.overlay.particlePalette=this.particlePalette;this.publishOverlay();this.queuePersist();},
+    applyParticleColor(){this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader('custom',this.particleColor));this.overlay.particlePalette='custom';this.overlay.particleColor=this.particleColor;this.publishOverlay();this.queuePersist();},
     applyBackground(){this.scene.setBackgroundColor(hexColor(this.backgroundColor));this.queuePersist();},
     toggleAdaptive(){if(this.adaptiveController){this.adaptiveController.dispose();this.adaptiveController=null;}if(this.adaptiveEnabled)this.adaptiveController=createAdaptiveQuality({scene:this.scene,quality:'auto',maxParticles:100000,onChange:count=>{this.particlesCount=count;}});},
-    projectSnapshot(){return{version:2,name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,seed:this.seed,spawnMode:this.spawnMode},appearance:{particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
-    async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};if(!snapshot.version&&this.overlay.palette==='cyan')this.overlay.palette='magnitude';this.applyParticleStyle();this.applyParticleColor();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
+    projectSnapshot(){return{version:3,name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,performanceProfile:this.performanceProfile,seed:this.seed,spawnMode:this.spawnMode},appearance:{particlePalette:this.particlePalette,particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
+    async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,performanceProfile:snapshot.simulation.performanceProfile||'custom',seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};if(!snapshot.version&&this.overlay.palette==='cyan')this.overlay.palette='magnitude';this.applyParticleStyle();this.applyParticlePalette();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
     persistStudioState(){if(this.scene&&!this.restoring)try{const snapshot=this.projectSnapshot();snapshot.code=this.currentModel?.code;localStorage.setItem('fieldplay-studio-current',JSON.stringify(snapshot));const url=new URL(location.href);url.searchParams.set('sx',this.xExpression);url.searchParams.set('sy',this.yExpression);if(this.parameterText)url.searchParams.set('sp',this.parameterText);else url.searchParams.delete('sp');history.replaceState(null,'',url);}catch(error){}},
     queuePersist(){if(this.restoring||!this.scene)return;clearTimeout(this.persistTimer);this.persistTimer=setTimeout(()=>this.persistStudioState(),180);},
     undo(){this.restoreSnapshot(this.history.undo());},redo(){this.restoreSnapshot(this.history.redo());},
@@ -446,6 +454,12 @@ function hex(x) {
   return value;
 }
 function hexColor(value) { const text=String(value||'#000000').replace('#','');return {r:parseInt(text.slice(0,2),16)/255,g:parseInt(text.slice(2,4),16)/255,b:parseInt(text.slice(4,6),16)/255,a:1}; }
+const SOLID_COLORS={cyan:'#4ec4ff',blue:'#4d96ff',teal:'#36d6bd',green:'#74d680',gold:'#ffbe54',orange:'#ff8a4c',red:'#fc6255',pink:'#ff6faf',violet:'#b273ff',white:'#e6f3ff'};
+function particlePaletteShader(name,custom){
+  if(name==='magnitude')return `vec3 studio_palette(float t){vec3 a=vec3(0.345,0.769,0.867),b=vec3(1.0,0.882,0.329),c=vec3(0.988,0.384,0.333);return t<0.65?mix(a,b,t/0.65):mix(b,c,(t-0.65)/0.35);} vec4 get_color(vec2 p){float s=clamp((length(get_velocity(p))-u_velocity_range.x)/max(0.000001,u_velocity_range.y-u_velocity_range.x),0.0,1.0);return vec4(studio_palette(s),1.0);}`;
+  if(name==='rainbow')return `vec4 get_color(vec2 p){vec2 v=get_velocity(p);float h=(atan(v.y,v.x)+PI)/(2.0*PI);return vec4(hsv2rgb(vec3(h,0.82,1.0)),1.0);}`;
+  const {r,g,b}=hexColor(name==='custom'?custom:(SOLID_COLORS[name]||SOLID_COLORS.cyan));return `vec4 get_color(vec2 p){return vec4(${r.toFixed(4)},${g.toFixed(4)},${b.toFixed(4)},1.0);}`;
+}
 </script>
 
 <style lang='stylus'>
