@@ -14,5 +14,5 @@ describe('math expressions',()=>{
   it('reports incorrect function arity',()=>expect(()=>compileExpression('sin(1,2)')).toThrow('expects 1 argument'));
   it('supports polar coordinates and time',()=>{const f=compileExpression('r*cos(theta)+t');expect(f.evaluate(3,4,2)).toBeCloseTo(5);expect(compileVectorField('r','theta+t').code).toContain('float t = frame');});
   it('supports piecewise comparisons',()=>{expect(compileExpression('piecewise(lt(x,0),-x,x)').evaluate(-3,0)).toBe(3);expect(compileExpression('between(x,-1,1)').evaluate(.5,0)).toBe(1);});
-  it('expands simple user-defined functions',()=>{const defs=parseUserFunctions('f(u,v)=sin(u)+v');expect(expandUserFunctions('f(x,y)',defs)).toContain('sin((x))');expect(compileVectorField('f(x,y)','0',{},'f(u,v)=u*v').evaluate(2,3)[0]).toBe(6);});
+  it('expands nested user-defined function arguments',()=>{const defs=parseUserFunctions('f(u,v)=sin(u)+v');expect(expandUserFunctions('f(cos(x),y)',defs)).toContain('sin((cos(x)))');expect(compileVectorField('f(x,y)','0',{},'f(u,v)=u*v').evaluate(2,3)[0]).toBe(6);});
 });
