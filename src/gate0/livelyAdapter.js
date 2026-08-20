@@ -1,4 +1,5 @@
 const listeners = new Set();
+const audioListeners = new Set();
 
 const state = {
   detected: false,
@@ -45,6 +46,7 @@ window.livelyWallpaperPlaybackChanged = data => {
 
 window.livelyAudioListener = audioArray => {
   state.audio = parsePayload(audioArray) || audioArray;
+  audioListeners.forEach(listener => listener(state.audio));
   publish();
 };
 
@@ -64,4 +66,9 @@ export function subscribeToLively(listener) {
 
 export function getLivelySnapshot() {
   return snapshot();
+}
+
+export function subscribeToLivelyAudio(listener) {
+  audioListeners.add(listener);
+  return () => audioListeners.delete(listener);
 }

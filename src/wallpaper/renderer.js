@@ -13,11 +13,17 @@ uniform float motion;
 uniform float bloom;
 uniform float audioEnergy;
 uniform int steps;
+uniform int scene;
+uniform int paletteIndex;
+uniform float seed;
 
 float hash21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+1.),f.x),f.y);}
 vec3 palette(float t){
   vec3 cyan=vec3(.08,.55,1.45), violet=vec3(.45,.12,1.05), gold=vec3(1.2,.42,.07);
+  if(paletteIndex==1){cyan=vec3(.02,1.1,.58);violet=vec3(.08,.42,1.25);gold=vec3(.65,.1,1.1);}
+  if(paletteIndex==2){cyan=vec3(1.2,.16,.015);violet=vec3(.72,.025,.01);gold=vec3(1.45,.72,.08);}
+  if(paletteIndex==3){cyan=vec3(.35);violet=vec3(.8);gold=vec3(1.35);}
   return mix(mix(cyan,violet,smoothstep(.15,.72,t)),gold,smoothstep(.79,1.,t));
 }
 void main(){
@@ -33,25 +39,44 @@ void main(){
   stars*=.32+.68*hash21(floor(gl_FragCoord.xy*.17));
   col+=stars*vec3(.55,.72,1.0)*smoothstep(.14,.5,r);
 
-  float haze=noise(p*3.2+vec2(t*.01,0.));
+  float haze=noise(p*3.2+vec2(t*.01+seed*7.,0.));
   haze*=noise(p*7.-vec2(0,t*.015));
   col+=vec3(.015,.035,.11)*haze*smoothstep(.9,.05,abs(p.y+.22+p.x*.12));
 
   int count=max(1,steps);
-  for(int i=0;i<82;i++){
-    if(i>=count) break;
-    float fi=float(i);
-    float seed=fi/float(count);
-    float phase=seed*6.28318;
-    float band=.045+seed*.72;
-    float polarity=mod(fi,2.)*2.-1.;
-    float warp=a + polarity*(1.35/r) + t*(.035+seed*.02);
-    float line=abs(sin(warp*2.2+phase*5.3+sin(r*15.-t*.12)*.32));
-    line=smoothstep(.038,.0,line)*exp(-r*1.18);
-    float shell=exp(-pow((r-band)/(.035+seed*.018),2.));
-    float tail=smoothstep(-.95,.85,cos(a-phase*.32));
-    float energy=line*shell*(.38+.62*tail);
-    col+=palette(fract(seed+.12*sin(phase)))*energy*(.032+audioEnergy*.018);
+  if(scene==0 || scene==1){
+    for(int i=0;i<82;i++){
+      if(i>=count) break;
+      float fi=float(i), s=fi/float(count), phase=s*6.28318+seed*3.;
+      float band=.045+s*.72, polarity=mod(fi,2.)*2.-1.;
+      float strength=scene==1?2.05:1.35;
+      float warp=a+polarity*(strength/r)+t*(.035+s*.02);
+      float line=smoothstep(.038,.0,abs(sin(warp*2.2+phase*5.3+sin(r*15.-t*.12)*.32)))*exp(-r*1.18);
+      float shell=exp(-pow((r-band)/(.035+s*.018),2.));
+      col+=palette(fract(s+.12*sin(phase)))*line*shell*(.012+audioEnergy*.012)*(scene==1?1.45:1.);
+    }
+  } else if(scene==2){
+    float n=0.,amp=.55; vec2 np=p*2.2+vec2(seed*11.,0.);
+    for(int o=0;o<6;o++){n+=amp*noise(np);np=np*2.03+vec2(2.7,-1.4);amp*=.52;}
+    float cloud=smoothstep(.42,.92,n+.22*sin(p.x*3.-p.y*2.+t*.035));
+    float cavity=smoothstep(.16,.5,length(p-vec2(.12,-.02)));
+    col+=palette(fract(n*.72+seed))*cloud*cavity*(.42+audioEnergy*.16);
+    col+=palette(.12)*pow(max(n-.63,0.),2.)*2.;
+  } else if(scene==3){
+    vec2 g=p-vec2(.16,0.);float gr=length(vec2(g.x,g.y*1.7));float ga=atan(g.y*1.7,g.x);
+    float arms=.5+.5*cos(3.*ga-10.*log(gr+.08)+t*.08+seed*5.);
+    float dust=noise(vec2(ga*2.5,gr*18.)+seed*9.);
+    float disk=exp(-gr*3.8)*smoothstep(.02,.16,gr);
+    col+=palette(fract(gr*1.1+.15))*disk*pow(arms,5.)*(.65+.7*dust)*(1.+audioEnergy*.2);
+    col+=vec3(.9,.72,.48)*exp(-gr*18.)*1.8;
+  } else {
+    vec2 bh=p-vec2(.2,0.);float br=length(bh);float ba=atan(bh.y,bh.x);
+    float ring=exp(-pow((br-.19)/.018,2.));
+    float disk=exp(-pow((abs(bh.y)-.018)/(.018+abs(bh.x)*.035),2.))*smoothstep(.08,.68,abs(bh.x));
+    float doppler=.35+1.15*smoothstep(-.7,.8,cos(ba));
+    col+=palette(fract(ba/6.28318+.5))*disk*doppler*(.8+audioEnergy*.12);
+    col+=vec3(.25,.42,1.15)*ring*(.7+bloom);
+    col*=smoothstep(.095,.145,br);
   }
 
   float core=exp(-r*30.);
@@ -76,7 +101,7 @@ export function createCosmicRenderer(canvas) {
   const position = gl.getAttribLocation(program, 'position');
   gl.enableVertexAttribArray(position);
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-  const uniforms = Object.fromEntries(['resolution','time','motion','bloom','audioEnergy','steps'].map(name => [name, gl.getUniformLocation(program,name)]));
+  const uniforms = Object.fromEntries(['resolution','time','motion','bloom','audioEnergy','steps','scene','paletteIndex','seed'].map(name => [name, gl.getUniformLocation(program,name)]));
 
   function resize(scale) {
     const width = Math.max(1, Math.round(innerWidth * devicePixelRatio * scale));
@@ -93,6 +118,9 @@ export function createCosmicRenderer(canvas) {
     gl.uniform1f(uniforms.bloom,state.bloom);
     gl.uniform1f(uniforms.audioEnergy,state.audioEnergy);
     gl.uniform1i(uniforms.steps,state.steps);
+    gl.uniform1i(uniforms.scene,state.scene);
+    gl.uniform1i(uniforms.paletteIndex,state.palette);
+    gl.uniform1f(uniforms.seed,state.seed);
     gl.drawArrays(gl.TRIANGLES,0,3);
   }
   function dispose(){gl.deleteBuffer(buffer);gl.deleteVertexArray(vao);gl.deleteProgram(program);}

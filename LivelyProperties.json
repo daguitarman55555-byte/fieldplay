@@ -1,4 +1,10 @@
 {
+  "scene": {
+    "text": "Scene",
+    "type": "dropdown",
+    "value": 0,
+    "items": ["Auto", "Field", "Attractor", "Nebula", "Galaxy", "Black Hole"]
+  },
   "quality": {
     "text": "Quality",
     "type": "dropdown",
@@ -31,6 +37,23 @@
     "text": "Audio reactivity",
     "type": "checkbox",
     "value": true
+  },
+  "palette": {
+    "text": "Palette",
+    "type": "dropdown",
+    "value": 0,
+    "items": ["Cosmic", "Aurora", "Ember", "Monochrome"]
+  },
+  "autoChange": {
+    "text": "Auto-change",
+    "type": "dropdown",
+    "value": 1,
+    "items": ["1 minute", "5 minutes", "15 minutes", "Off"]
+  },
+  "seed": {
+    "text": "Seed",
+    "type": "textbox",
+    "value": "fieldplay"
   },
   "runDiagnostics": {
     "text": "Run diagnostics again",
