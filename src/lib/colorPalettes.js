@@ -14,11 +14,13 @@ export const PALETTES={
   spectral:{label:'Spectral',type:'diverging',stops:['#9e0142','#f46d43','#fee08b','#ffffbf','#e6f598','#66c2a5','#5e4fa2']},
   twilight:{label:'Twilight',type:'cyclic',stops:['#e2d9e2','#6f75b5','#1e1e2f','#9b425e','#e2d9e2']},
   rainbow:{label:'Direction rainbow',type:'cyclic',stops:['#ff5d5d','#ffd65d','#65df78','#57c7ff','#9b75ff','#ff5dbe','#ff5d5d']},
+  studio:{label:'Custom gradient',type:'sequential',stops:['#32105c','#00d9ff','#fff66d']},
   cyan:{label:'Cyan',type:'solid',stops:['#4ec4ff']},blue:{label:'Blue',type:'solid',stops:['#4d96ff']},teal:{label:'Teal',type:'solid',stops:['#36d6bd']},green:{label:'Green',type:'solid',stops:['#74d680']},gold:{label:'Gold',type:'solid',stops:['#ffbe54']},orange:{label:'Orange',type:'solid',stops:['#ff8a4c']},red:{label:'Red',type:'solid',stops:['#fc6255']},pink:{label:'Pink',type:'solid',stops:['#ff6faf']},violet:{label:'Violet',type:'solid',stops:['#b273ff']},white:{label:'White',type:'solid',stops:['#e6f3ff']}
 };
 export const PALETTE_OPTIONS=Object.entries(PALETTES).map(([value,p])=>({value,label:p.label,type:p.type}));
 export function paletteStops(name){return(PALETTES[name]||PALETTES.magnitude).stops;}
 export function paletteGradient(name){return`linear-gradient(90deg, ${paletteStops(name).join(', ')})`;}
+export function setCustomGradient(stops){if(Array.isArray(stops)&&stops.length>=2&&stops.every(x=>/^#[0-9a-f]{6}$/i.test(x)))PALETTES.studio.stops=stops.slice();return PALETTES.studio.stops;}
 export function paletteColor(name,t=0.5,alpha=1){const stops=paletteStops(name);if(stops.length===1)return rgba(stops[0],alpha);t=Math.max(0,Math.min(1,Number.isFinite(t)?t:0))*(stops.length-1);const i=Math.min(stops.length-2,Math.floor(t)),u=t-i,a=hexRgb(stops[i]),b=hexRgb(stops[i+1]),rgb=a.map((x,k)=>Math.round(x+(b[k]-x)*u));return `rgba(${rgb.join(',')},${Math.max(0,Math.min(1,Number.isFinite(alpha)?alpha:1))})`;}
 export function paletteShader(name){const stops=paletteStops(name).map(hexRgb);if(stops.length===1)return`vec3(${stops[0].map(x=>(x/255).toFixed(5)).join(',')})`;let body='';for(let i=0;i<stops.length-1;i++){const a=stops[i].map(x=>(x/255).toFixed(5)).join(','),b=stops[i+1].map(x=>(x/255).toFixed(5)).join(','),lo=i/(stops.length-1),hi=(i+1)/(stops.length-1);body+=`${i?'else ':''}if(t<=${hi.toFixed(6)})return mix(vec3(${a}),vec3(${b}),clamp((t-${lo.toFixed(6)})/${(hi-lo).toFixed(6)},0.0,1.0));`;}return body+`return vec3(${stops.at(-1).map(x=>(x/255).toFixed(5)).join(',')});`;}
 export function particlePaletteShader(name,custom='#4ec4ff'){

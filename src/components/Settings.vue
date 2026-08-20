@@ -9,7 +9,7 @@
         <label><span>Parameters</span><input v-model='parameterText' placeholder='a=1, b=0.25' @keyup.enter='applyMathField'></label>
         <label><span>Functions</span><input v-model='functionDefinitions' placeholder='f(u,v)=sin(u)+cos(v)' @keyup.enter='applyMathField'></label>
         <div class='parameter-control' v-for='(value, name) in parameterValues' :key='name'>
-          <span>{{name}}</span><input type='range' min='-10' max='10' step='.01' :value='value' @input='updateParameter(name, $event.target.value)'><output>{{Number(value).toFixed(2)}}</output>
+          <button type='button' class='parameter-play' @click='toggleParameterAnimation(name)' :title='animatedParameter===name?`Stop animation`:`Animate parameter`'>{{animatedParameter===name?'■':'▶'}}</button><span>{{name}}</span><input type='range' min='-10' max='10' step='.01' :value='value' @input='updateParameter(name, $event.target.value)'><output>{{Number(value).toFixed(2)}}</output>
         </div>
         <button @click='applyMathField'>Apply equations</button>
         <p class='math-error' v-if='mathError'>{{mathError}}</p>
@@ -20,9 +20,9 @@
       <details class='advanced-code'><summary>Developer mode — advanced GLSL</summary>
       <code-editor :model='vectorField'></code-editor>
       </details>
-      <details class='preset-library'><summary>Field preset library ({{presets.length}})</summary>
+      <details class='preset-library'><summary>Field preset gallery ({{presets.length}})</summary>
         <input class='preset-search' v-model='presetSearch' placeholder='Search field presets'>
-        <div class='preset-grid'><button v-for='preset in filteredPresets' :key='preset.name' @click='applyPreset(preset)'>{{preset.name}}</button></div>
+        <div class='preset-grid'><div class='preset-card' v-for='preset in filteredPresets' :key='preset.name'><button @click='applyPreset(preset)'>{{preset.name}}</button><button class='favorite' @click='toggleFavorite(preset.name)' :title='isFavorite(preset.name)?`Remove favorite`:`Add favorite`'>{{isFavorite(preset.name)?'★':'☆'}}</button></div></div>
       </details>
       <div class='gradient-builder'>
         <div class='title small'>Gradient field</div>
@@ -69,11 +69,17 @@
       <div class='overlay-controls'>
         <div class='title small'>Visualization layers</div>
         <label v-for='item in overlayToggles' :key='item.key'><input type='checkbox' v-model='overlay[item.key]' @change='publishOverlay'> {{item.label}}</label>
+        <label><input type='checkbox' v-model='overlay.lic' @change='publishOverlay'> Flow texture (LIC)</label>
+        <label><input type='checkbox' v-model='overlay.nullclines' @change='publishOverlay'> Nullclines</label>
+        <label><input type='checkbox' v-model='overlay.separatrices' @change='publishOverlay'> Separatrices</label>
+        <label><input type='checkbox' v-model='overlay.integralLens' @change='publishOverlay'> Flux/circulation lens</label>
         <label class='range-label'>Arrow density <input type='range' min='8' max='42' v-model.number='overlay.arrowDensity' @input='publishOverlay'></label>
         <label class='range-label'>Arrow scaling <select v-model='overlay.arrowScale' @change='publishOverlay'><option value='normalized'>Normalized</option><option value='linear'>Linear magnitude</option><option value='sqrt'>Square-root magnitude</option><option value='log'>Logarithmic magnitude</option></select></label>
         <label class='range-label'>Overlay opacity <input type='range' min='.15' max='1' step='.05' v-model.number='overlay.opacity' @input='publishOverlay'></label>
-        <label>Arrow colors <select v-model='overlay.palette' @change='publishOverlay'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option></select></label>
-        <label class='match-colors'><input type='checkbox' v-model='overlay.matchParticles' @change='publishOverlay'> Match particle colors</label>
+        <label>Arrow colors <select v-model='overlay.palette' @change='onArrowPaletteChange'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option><option value='custom'>Custom particle color</option></select></label>
+        <label class='match-colors'><input type='checkbox' v-model='overlay.matchParticles' @change='toggleColorSync'> Sync vectors + particles</label>
+        <label class='range-label'>Color scaling <select v-model='overlay.rangeMode' @change='publishOverlay'><option value='percentile'>Robust automatic</option><option value='linear'>Full linear range</option><option value='log'>Logarithmic</option><option value='symmetric'>Symmetric ± range</option><option value='manual'>Manual range</option></select></label>
+        <template v-if='overlay.rangeMode===`manual`'><label>Range minimum <input type='number' v-model.number='overlay.rangeMin' @input='publishOverlay'></label><label>Range maximum <input type='number' v-model.number='overlay.rangeMax' @input='publishOverlay'></label></template>
         <label v-if='overlay.heatmap'>Heatmap palette <select v-model='overlay.heatmapPalette' @change='publishOverlay'><option v-for='color in scalarPalettes' :key='color.value' :value='color.value'>{{color.label}}</option></select></label>
         <label v-if='overlay.contours' class='range-label'>Contour quantity <select v-model='overlay.contourQuantity' @change='publishOverlay'><option value='magnitude'>Vector magnitude |F|</option><option value='divergence'>Divergence ∇·F</option><option value='curl'>2D curl</option><option value='potential'>Scalar potential f</option></select></label>
         <label v-if='overlay.contours' class='range-label'><span><input type='checkbox' v-model='overlay.linkContourDensity' @change='publishOverlay'> Link contour density</span><output>{{effectiveContourLevels}} levels</output></label>
@@ -157,6 +163,7 @@
         <label>Particle opacity <input type='range' min='.05' max='1' step='.05' v-model.number='particleOpacity' @input='applyParticleStyle'><output>{{particleOpacity}}</output></label>
         <label>Particle palette <select v-model='particlePalette' @change='applyParticlePalette'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option><option value='custom'>Custom color</option></select><span v-if='particlePalette!==`custom`' class='palette-preview' :style='{background:paletteGradient(particlePalette)}'></span></label>
         <label v-if='particlePalette===`custom`'>Custom particle color <input type='color' v-model='particleColor' @input='applyParticleColor'></label>
+        <div class='gradient-stops'><span>Custom gradient</span><input v-for='(stop,index) in gradientStops' :key='index' type='color' v-model='gradientStops[index]' @input='applyCustomGradient'><button type='button' @click='useCustomGradient'>Use</button></div>
         <label>Background <input type='color' v-model='backgroundColor' @input='applyBackground'></label>
         <label>Seed <input type='number' v-model.number='seed' @change='applySpawn'></label>
         <label>Spawn <select v-model='spawnMode' @change='applySpawn'><option value='random'>Random</option><option value='grid'>Grid</option><option value='ring'>Ring</option></select></label>
@@ -210,7 +217,7 @@ import CodeEditor from './CodeEditor.vue';
 import Inputs from './Inputs.vue';
 import MathExpressionInput from './MathExpressionInput.vue';
 import { compileGradientField, compileVectorField, parseParameters, FUNCTION_DATABASE, FUNCTION_HELP } from '../lib/math/expression.js';
-import { PALETTE_OPTIONS, paletteGradient, particlePaletteShader } from '../lib/colorPalettes.js';
+import { PALETTE_OPTIONS, paletteGradient, particlePaletteShader, setCustomGradient } from '../lib/colorPalettes.js';
 import { STUDIO_PRESETS } from '../lib/studioPresets.js';
 import { createAdaptiveQuality } from '../lib/wallpaper/adaptiveQuality.js';
 import { createHistory, deleteProject, listProjects, saveProject } from '../lib/studioProjects.js';
@@ -247,6 +254,7 @@ export default {
     bus.off('studio-randomize', this.randomizeStudioField, this);
     if (this.adaptiveController) this.adaptiveController.dispose();
     if (this.persistTimer) clearTimeout(this.persistTimer);
+    if (this.parameterTimer) clearInterval(this.parameterTimer);
     document.removeEventListener('keydown',this.onHistoryKey);
   },
   data() {
@@ -262,10 +270,10 @@ export default {
       parameterValues: {},
       mathError: '',
       mathWarnings:[],commandOpen:false,commandSearch:'',
-      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,arrowScale:'sqrt',opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,contourLabels:true,contourFill:false,adaptiveContours:true,sampleQuality:'balanced',probe:true,trajectories:true,animateStreamlines:false,compareMode:'overlay',particlePalette:'cyan',particleColor:'#4ec4ff'},
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,lic:false,nullclines:false,separatrices:false,integralLens:false,arrowDensity:22,arrowScale:'sqrt',opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,rangeMode:'percentile',rangeMin:0,rangeMax:1,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,contourLabels:true,contourFill:false,adaptiveContours:true,sampleQuality:'balanced',probe:true,trajectories:true,animateStreamlines:false,compareMode:'overlay',particlePalette:'cyan',particleColor:'#4ec4ff'},
       overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Contour lines'},{key:'critical',label:'Critical points'}],
       colorPalettes:PALETTE_OPTIONS,scalarPalettes:PALETTE_OPTIONS.filter(x=>x.type==='sequential'||x.type==='diverging'),functionDatabase:FUNCTION_DATABASE,functionHelp:FUNCTION_HELP,
-      integrator:'rk4',speedMultiplier:1,performanceProfile:'balanced',particleSize:1.5,particleOpacity:1,particlePalette:'cyan',particleColor:'#4ec4ff',backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,
+      integrator:'rk4',speedMultiplier:1,performanceProfile:'balanced',particleSize:1.5,particleOpacity:1,particlePalette:'cyan',particleColor:'#4ec4ff',gradientStops:['#32105c','#00d9ff','#fff66d'],backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,animatedParameter:null,favoritePresets:JSON.parse(localStorage.getItem('fieldplay-favorites')||'[]'),
       history:createHistory(),projectName:'My field',savedProjects:listProjects(),comparisonActive:false,restoring:false,
       soundCloudLink: 'https://soundcloud.com/mrfijiwiji/yours-truly',
       vectorField: null,
@@ -326,7 +334,7 @@ export default {
     effectiveContourLevels(){return this.overlay.linkContourDensity?3+Math.round((this.overlay.arrowDensity-8)/34*21):this.overlay.contourLevels;},
     filteredPresets() {
       const query=this.presetSearch.trim().toLowerCase();
-      return query ? this.presets.filter(p=>`${p.name} ${p.x} ${p.y}`.toLowerCase().includes(query)) : this.presets;
+      const list=query ? this.presets.filter(p=>`${p.name} ${p.x} ${p.y}`.toLowerCase().includes(query)) : this.presets;return [...list].sort((a,b)=>Number(this.isFavorite(b.name))-Number(this.isFavorite(a.name)));
     },
     particleCountDelta() {
       return exponentialStep(this.particlesCount);
@@ -361,7 +369,12 @@ export default {
       try { const parameters=parseParameters(this.parameterText);this.parameterValues={...parameters};const model=compileVectorField(this.xExpression,this.yExpression,parameters,this.functionDefinitions);const result=await this.vectorField.setCode(model.code);if(result?.error)throw new Error(result.error.error||result.error.message||'Shader compilation failed');this.mathError='';this.mathWarnings=[...new Set(model.warnings)];this.currentModel=model;bus.fire('studio-field-model',model);if(!this.restoring)this.history.push(this.projectSnapshot());this.persistStudioState();return model; } catch(error){this.mathError=error.message||String(error);return null;}
     },
     updateParameter(name,value){this.parameterValues[name]=Number(value);this.parameterText=Object.entries(this.parameterValues).map(([key,val])=>`${key}=${val}`).join(', ');this.applyMathField();},
+    toggleParameterAnimation(name){if(this.animatedParameter===name){clearInterval(this.parameterTimer);this.parameterTimer=null;this.animatedParameter=null;return;}clearInterval(this.parameterTimer);this.animatedParameter=name;this.parameterTimer=setInterval(()=>{let v=Number(this.parameterValues[name]||0)+.06;if(v>10)v=-10;this.updateParameter(name,v);},90);},
+    isFavorite(name){return this.favoritePresets.includes(name);},
+    toggleFavorite(name){this.favoritePresets=this.isFavorite(name)?this.favoritePresets.filter(x=>x!==name):[...this.favoritePresets,name];localStorage.setItem('fieldplay-favorites',JSON.stringify(this.favoritePresets));},
     publishOverlay(){bus.fire('studio-overlay-options',{...this.overlay});this.queuePersist();},
+    onArrowPaletteChange(){if(this.overlay.matchParticles){this.particlePalette=this.overlay.palette;this.applyParticlePalette();}else this.publishOverlay();},
+    toggleColorSync(){if(this.overlay.matchParticles){this.overlay.palette=this.particlePalette;this.overlay.particlePalette=this.particlePalette;}this.publishOverlay();},
     clearTrajectories(){bus.fire('studio-clear-trajectories');},
     runCommand(command){this.commandOpen=false;this.commandSearch='';command.action();},
     downloadSVG(){bus.fire('studio-export-svg');},
@@ -369,12 +382,14 @@ export default {
     applyPerformanceProfile(){const profiles={eco:{particles:12000,integrator:'midpoint',density:14},balanced:{particles:25000,integrator:'rk4',density:22},detail:{particles:50000,integrator:'rk4',density:30}},profile=profiles[this.performanceProfile];if(!profile)return;this.particlesCount=profile.particles;this.integrator=profile.integrator;this.overlay.arrowDensity=profile.density;this.applySimulation();this.publishOverlay();},
     applySpawn(){this.scene.setSeed(this.seed);this.scene.setSpawnMode(this.spawnMode);this.persistStudioState();},
     applyParticleStyle(){this.scene.setParticleStyle({size:this.particleSize,opacity:this.particleOpacity});this.queuePersist();},
-    applyParticlePalette(){if(this.particlePalette==='custom')return this.applyParticleColor();if(this.particlePalette==='rainbow'){this.selectedColorMode=3;this.scene.setColorMode(3);}else{this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader(this.particlePalette,this.particleColor));}this.overlay.particlePalette=this.particlePalette;this.publishOverlay();this.queuePersist();},
-    applyParticleColor(){this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader('custom',this.particleColor));this.overlay.particlePalette='custom';this.overlay.particleColor=this.particleColor;this.publishOverlay();this.queuePersist();},
+    applyParticlePalette(){if(this.particlePalette==='custom')return this.applyParticleColor();if(this.particlePalette==='rainbow'){this.selectedColorMode=3;this.scene.setColorMode(3);}else{this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader(this.particlePalette,this.particleColor));}this.overlay.particlePalette=this.particlePalette;if(this.overlay.matchParticles)this.overlay.palette=this.particlePalette;this.publishOverlay();this.queuePersist();},
+    applyParticleColor(){this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader('custom',this.particleColor));this.overlay.particlePalette='custom';this.overlay.particleColor=this.particleColor;if(this.overlay.matchParticles)this.overlay.palette='custom';this.publishOverlay();this.queuePersist();},
+    applyCustomGradient(){setCustomGradient(this.gradientStops);if(this.particlePalette==='studio')this.applyParticlePalette();else this.publishOverlay();},
+    useCustomGradient(){setCustomGradient(this.gradientStops);this.particlePalette='studio';this.applyParticlePalette();},
     applyBackground(){this.scene.setBackgroundColor(hexColor(this.backgroundColor));this.queuePersist();},
     toggleAdaptive(){if(this.adaptiveController){this.adaptiveController.dispose();this.adaptiveController=null;}if(this.adaptiveEnabled)this.adaptiveController=createAdaptiveQuality({scene:this.scene,quality:'auto',maxParticles:100000,onChange:count=>{this.particlesCount=count;}});},
-    projectSnapshot(){return{version:4,name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,functionDefinitions:this.functionDefinitions,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,performanceProfile:this.performanceProfile,seed:this.seed,spawnMode:this.spawnMode},appearance:{particlePalette:this.particlePalette,particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
-    async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,performanceProfile:snapshot.simulation.performanceProfile||'custom',seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};if(!snapshot.version&&this.overlay.palette==='cyan')this.overlay.palette='magnitude';this.applyParticleStyle();this.applyParticlePalette();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
+    projectSnapshot(){return{version:5,name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,functionDefinitions:this.functionDefinitions,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,performanceProfile:this.performanceProfile,seed:this.seed,spawnMode:this.spawnMode},appearance:{particlePalette:this.particlePalette,particleColor:this.particleColor,gradientStops:[...this.gradientStops],backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
+    async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,performanceProfile:snapshot.simulation.performanceProfile||'custom',seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};if(!snapshot.version&&this.overlay.palette==='cyan')this.overlay.palette='magnitude';setCustomGradient(this.gradientStops);this.applyParticleStyle();this.applyParticlePalette();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
     persistStudioState(){if(this.scene&&!this.restoring)try{const snapshot=this.projectSnapshot();snapshot.code=this.currentModel?.code;localStorage.setItem('fieldplay-studio-current',JSON.stringify(snapshot));const url=new URL(location.href);url.searchParams.set('sx',this.xExpression);url.searchParams.set('sy',this.yExpression);if(this.parameterText)url.searchParams.set('sp',this.parameterText);else url.searchParams.delete('sp');history.replaceState(null,'',url);}catch(error){}},
     queuePersist(){if(this.restoring||!this.scene)return;clearTimeout(this.persistTimer);this.persistTimer=setTimeout(()=>this.persistStudioState(),180);},
     undo(){this.restoreSnapshot(this.history.undo());},redo(){this.restoreSnapshot(this.history.redo());},
@@ -511,7 +526,8 @@ help-background = rgb(7, 12, 23);
 .section-heading small { display:block;margin-top:3px;color:#7893ad;font-size:11px; }
 .preset-library { margin-top:9px;border-top:1px solid #21334b;padding-top:8px; }
 .preset-library summary,.function-database summary { cursor:pointer;color:#9ab6d2;font-size:12px; }
-.preset-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:12px; }
+.preset-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:12px; }
+.preset-card{display:grid;grid-template-columns:1fr 28px}.preset-card .favorite{padding:0;color:#ffd65d}
 .preset-grid button, .export-panel button { padding:8px 5px; border:1px solid #294563; background:#071526; color:#9ec8ed; cursor:pointer; }
 .preset-grid button:hover, .export-panel button:hover { border-color:#42aaf5; color:white; }
 .export-panel { color:#9ab6d2; }
@@ -535,7 +551,8 @@ help-background = rgb(7, 12, 23);
 .math-editor { display:grid; gap:7px; margin-bottom:10px; }
 .math-editor label { display:grid; grid-template-columns:76px 1fr; align-items:center; font:12px ui-monospace,monospace; color:#9ab6d2; }
 .math-editor input { margin:0 !important; border:1px solid #2c4562 !important; background:#061121 !important; }
-.parameter-control { display:grid;grid-template-columns:76px 1fr 44px;align-items:center;gap:6px;color:#9ab6d2;font:11px ui-monospace,monospace; }
+.parameter-control { display:grid;grid-template-columns:28px 42px 1fr 44px;align-items:center;gap:6px;color:#9ab6d2;font:11px ui-monospace,monospace; }
+.parameter-play{padding:3px!important;margin:0!important;border:1px solid #294563!important;background:#071526!important;color:#62c7ff!important}
 .preset-search { box-sizing:border-box;margin:10px 0 0 !important;border:1px solid #2c4562 !important;background:#061121 !important; }
 .math-editor button { padding:9px;border:1px solid #297ec1;color:white;background:#12558d;cursor:pointer; }
 .math-error { color:#ff8f9b;font:12px/1.4 ui-monospace,monospace;margin:3px 0; }
@@ -550,6 +567,7 @@ help-background = rgb(7, 12, 23);
 .studio-simulation-controls label { display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:8px;font-size:12px;color:#9ab6d2; }
 .studio-simulation-controls input[type='color'] { width:100%;height:28px;background:transparent;border:1px solid #294563; }
 .palette-preview { width:42px;height:18px;border:1px solid #52708c;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25); }
+.gradient-stops{display:grid;grid-template-columns:110px repeat(3,1fr) 42px;gap:6px;align-items:center;font-size:12px;color:#9ab6d2}.gradient-stops input{height:28px;width:100%}.gradient-stops button{height:28px;border:1px solid #297ec1;background:#12558d;color:white}
 .studio-simulation-controls .auto-quality { grid-template-columns:auto 1fr; }
 .command-backdrop{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.58);display:flex;align-items:flex-start;justify-content:center;padding-top:13vh}.command-palette{width:min(520px,88vw);max-height:60vh;overflow:auto;padding:10px;background:#071526;border:1px solid #426887;box-shadow:0 20px 70px #000}.command-palette input{box-sizing:border-box;width:100%;margin:0 0 8px!important;padding:12px!important;font-size:16px!important;background:#020a13!important;border:1px solid #365875!important;color:white!important}.command-palette button{width:100%;display:flex;justify-content:space-between;padding:10px;border:0;border-top:1px solid #152d44;background:transparent;color:#b9dafa;text-align:left;cursor:pointer}.command-palette button:hover{background:#11304b;color:white}.command-palette kbd{color:#6689a8}
 .title.small { font-size: 14px; }
