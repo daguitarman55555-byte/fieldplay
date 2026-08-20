@@ -95,7 +95,7 @@ function toGLSL(ast,parameters){
 function evaluate(ast,scope){
   if(ast.type==='number')return ast.value;if(ast.type==='name')return scope[ast.name];if(ast.type==='unary')return ast.op==='-'?-evaluate(ast.value,scope):evaluate(ast.value,scope);
   if(ast.type==='binary'){const a=evaluate(ast.left,scope),b=evaluate(ast.right,scope);return ast.op==='+'?a+b:ast.op==='-'?a-b:ast.op==='*'?a*b:ast.op==='/'?a/b:a**b;}
-  const args=ast.args.map(x=>evaluate(x,scope)); if(ast.name==='log')return Math.log(args[0]);return Math[ast.name](...args);
+  const args=ast.args.map(x=>evaluate(x,scope)); if(ast.name==='atan'&&args.length===2)return Math.atan2(args[0],args[1]);return Math[ast.name](...args);
 }
 function glslNumber(value){const n=Number(value);return Number.isInteger(n)?n.toFixed(1):String(n);}
 function syntax(message){return new Error(message);}

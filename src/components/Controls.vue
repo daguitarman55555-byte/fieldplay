@@ -22,8 +22,6 @@
 <script>
 import appState from '../lib/appState.js';
 import bus from '../lib/bus.js';
-import generateFunction from '../lib/generate-equation.js';
-import wrapVectorField from '../lib/wrapVectorField.js';
 
 export default {
   mounted() {
@@ -47,7 +45,7 @@ export default {
       }
     },
     generateNewFunction() {
-      window.scene.vectorFieldEditorState.setCode(wrapVectorField(generateFunction()));
+      bus.fire('studio-randomize');
     },
     togglePaused() {
       this.paused = !this.paused;

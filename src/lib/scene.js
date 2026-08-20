@@ -163,7 +163,7 @@ export default function initScene(gl) {
 
     setColorMode,
     getColorMode,
-    setColorFunction(code) { ctx.colorFunction = String(code || ''); appState.setColorFunction(ctx.colorFunction); drawProgram.updateColorMode(); },
+    setColorFunction(code) { ctx.colorFunction = String(code || '');ctx.colorMode=4;appState.setColorFunction(ctx.colorFunction);appState.setColorMode(4);drawProgram.updateColorMode(); },
     setIntegrator(method) { ctx.integrator=['euler','midpoint','rk4'].includes(method)?method:'rk4';drawProgram.setIntegrator(ctx.integrator); },
     getIntegrator: () => ctx.integrator,
     setSpeedMultiplier(value) { const n=Number(value);if(Number.isFinite(n))ctx.speedMultiplier=Math.max(0,Math.min(10,n)); },

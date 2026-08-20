@@ -6,4 +6,5 @@ describe('math expressions',()=>{
   it('parses parameter lists',()=>expect(parseParameters('a=2, b=-.5')).toEqual({a:2,b:-.5}));
   it('creates gradients from scalar expressions',()=>expect(compileGradientField('x^2+y^2').evaluate(2,3)).toEqual(expect.arrayContaining([expect.closeTo(4,4),expect.closeTo(6,4)])));
   it('rejects unknown symbols and statements',()=>{expect(()=>compileExpression('secret+x')).toThrow('Unknown symbol');expect(()=>parseExpression('x; y')).toThrow();});
+  it('matches GLSL two-argument atan semantics',()=>expect(compileExpression('atan(y,x)').evaluate(0,-1)).toBeCloseTo(-Math.PI/2));
 });

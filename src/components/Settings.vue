@@ -204,6 +204,7 @@ export default {
   mounted() {
     bus.on('scene-ready', this.onSceneReady, this);
     bus.on('bbox-change', this.updateBBox, this);
+    bus.on('studio-randomize', this.randomizeStudioField, this);
 
     // The renderer starts before Vue is lazy-loaded. Initialize immediately
     // when the scene already exists instead of relying on an event that may
@@ -216,7 +217,9 @@ export default {
   beforeUnmount() {
     bus.off('scene-ready', this.onSceneReady, this);
     bus.off('bbox-change', this.updateBBox, this);
+    bus.off('studio-randomize', this.randomizeStudioField, this);
     if (this.adaptiveController) this.adaptiveController.dispose();
+    if (this.persistTimer) clearTimeout(this.persistTimer);
     document.removeEventListener('keydown',this.onHistoryKey);
   },
   data() {
@@ -275,6 +278,12 @@ export default {
     selectedColorMode(newValue) {
       this.scene.setColorMode(newValue);
     },
+    'vectorField.code'(newCode) {
+      if(!newCode||this.restoring||newCode===this.currentModel?.code)return;
+      this.currentModel=null;
+      bus.fire('studio-field-model',null);
+      this.mathError='Advanced GLSL is active. Mathematical overlays are hidden until you apply equations again.';
+    },
     minX(newValue) { this.moveBoundingBox('minX', newValue) },
     maxX(newValue) { this.moveBoundingBox('maxX', newValue) },
     minY(newValue) { this.moveBoundingBox('minY', newValue) },
@@ -312,23 +321,25 @@ export default {
       const cx=preset.center?.[0]||0, cy=preset.center?.[1]||0, half=preset.bounds/2;
       this.scene.applyBoundingBox({minX:cx-half,maxX:cx+half,minY:cy-half,maxY:cy+half});
     },
+    randomizeStudioField(){const preset=this.presets[Math.floor(Math.random()*this.presets.length)];this.applyPreset(preset);},
     async applyMathField() {
       try { const parameters=parseParameters(this.parameterText);this.parameterValues={...parameters};const model=compileVectorField(this.xExpression,this.yExpression,parameters);const result=await this.vectorField.setCode(model.code);if(result?.error)throw new Error(result.error.error||result.error.message||'Shader compilation failed');this.mathError='';this.currentModel=model;bus.fire('studio-field-model',model);if(!this.restoring)this.history.push(this.projectSnapshot());this.persistStudioState();return model; } catch(error){this.mathError=error.message||String(error);return null;}
     },
     updateParameter(name,value){this.parameterValues[name]=Number(value);this.parameterText=Object.entries(this.parameterValues).map(([key,val])=>`${key}=${val}`).join(', ');this.applyMathField();},
-    publishOverlay(){bus.fire('studio-overlay-options',{...this.overlay});},
-    applySimulation(){this.scene.setIntegrator(this.integrator);this.scene.setSpeedMultiplier(this.speedMultiplier);},
+    publishOverlay(){bus.fire('studio-overlay-options',{...this.overlay});this.queuePersist();},
+    applySimulation(){this.scene.setIntegrator(this.integrator);this.scene.setSpeedMultiplier(this.speedMultiplier);this.queuePersist();},
     applySpawn(){this.scene.setSeed(this.seed);this.scene.setSpawnMode(this.spawnMode);this.persistStudioState();},
-    applyParticleStyle(){this.scene.setParticleStyle({size:this.particleSize,opacity:this.particleOpacity});},
-    applyParticleColor(){const {r,g,b}=hexColor(this.particleColor);this.scene.setColorFunction(`vec4 get_color(vec2 p) { return vec4(${r.toFixed(4)}, ${g.toFixed(4)}, ${b.toFixed(4)}, 1.0); }`);this.selectedColorMode=4;this.scene.setColorMode(4);},
-    applyBackground(){this.scene.setBackgroundColor(hexColor(this.backgroundColor));},
-    toggleAdaptive(){if(this.adaptiveController){this.adaptiveController.dispose();this.adaptiveController=null;}if(this.adaptiveEnabled)this.adaptiveController=createAdaptiveQuality({scene:this.scene,quality:'auto',maxParticles:100000});},
+    applyParticleStyle(){this.scene.setParticleStyle({size:this.particleSize,opacity:this.particleOpacity});this.queuePersist();},
+    applyParticleColor(){const {r,g,b}=hexColor(this.particleColor);this.selectedColorMode=4;this.scene.setColorFunction(`vec4 get_color(vec2 p) { return vec4(${r.toFixed(4)}, ${g.toFixed(4)}, ${b.toFixed(4)}, 1.0); }`);this.queuePersist();},
+    applyBackground(){this.scene.setBackgroundColor(hexColor(this.backgroundColor));this.queuePersist();},
+    toggleAdaptive(){if(this.adaptiveController){this.adaptiveController.dispose();this.adaptiveController=null;}if(this.adaptiveEnabled)this.adaptiveController=createAdaptiveQuality({scene:this.scene,quality:'auto',maxParticles:100000,onChange:count=>{this.particlesCount=count;}});},
     projectSnapshot(){return{name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,seed:this.seed,spawnMode:this.spawnMode},appearance:{particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
     async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};this.applyParticleStyle();this.applyParticleColor();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
-    persistStudioState(){if(this.scene&&!this.restoring)try{localStorage.setItem('fieldplay-studio-current',JSON.stringify(this.projectSnapshot()));}catch(error){}},
+    persistStudioState(){if(this.scene&&!this.restoring)try{const snapshot=this.projectSnapshot();snapshot.code=this.currentModel?.code;localStorage.setItem('fieldplay-studio-current',JSON.stringify(snapshot));const url=new URL(location.href);url.searchParams.set('sx',this.xExpression);url.searchParams.set('sy',this.yExpression);if(this.parameterText)url.searchParams.set('sp',this.parameterText);else url.searchParams.delete('sp');history.replaceState(null,'',url);}catch(error){}},
+    queuePersist(){if(this.restoring||!this.scene)return;clearTimeout(this.persistTimer);this.persistTimer=setTimeout(()=>this.persistStudioState(),180);},
     undo(){this.restoreSnapshot(this.history.undo());},redo(){this.restoreSnapshot(this.history.redo());},
     saveCurrentProject(){this.savedProjects=saveProject(this.projectSnapshot());},
-    loadProject(project){this.projectName=project.name;this.restoreSnapshot(project);this.history.push(project);},
+    async loadProject(project){this.projectName=project.name;await this.restoreSnapshot(project);this.history.push(project);},
     removeProject(name){this.savedProjects=deleteProject(name);},
     compareProject(project){try{const model=compileVectorField(project.xExpression,project.yExpression,parseParameters(project.parameterText));bus.fire('studio-compare-model',model);this.comparisonActive=true;}catch(error){this.mathError=error.message;}},
     clearComparison(){bus.fire('studio-compare-model',null);this.comparisonActive=false;},
@@ -343,8 +354,8 @@ export default {
       const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='fieldplay-state.json'; link.click();
       setTimeout(()=>URL.revokeObjectURL(link.href),0);
     },
-    applyGradient() {
-      try {const model=compileGradientField(this.scalarExpression,parseParameters(this.parameterText));this.vectorField.setCode(model.code).then(result=>{if(result?.error)throw new Error('Shader compilation failed');this.mathError='';bus.fire('studio-field-model',model);});}catch(error){this.mathError=error.message||String(error);}
+    async applyGradient() {
+      try {const model=compileGradientField(this.scalarExpression,parseParameters(this.parameterText));const result=await this.vectorField.setCode(model.code);if(result?.error)throw new Error(result.error.error||'Shader compilation failed');this.mathError='';this.currentModel=model;bus.fire('studio-field-model',model);if(!this.restoring)this.history.push(this.projectSnapshot());this.persistStudioState();}catch(error){this.mathError=error.message||String(error);}
     },
     moveBoundingBox(key, value) {
       if (this.ignoreBbox) {
@@ -379,6 +390,8 @@ export default {
     },
 
     onSceneReady(scene) {
+      if(this.initializedScene===scene)return;
+      this.initializedScene=scene;
       this.vectorField = scene.vectorFieldEditorState;
       this.particlesCount = scene.getParticlesCount();
       this.fadeOutSpeed = scene.getFadeOutSpeed();
@@ -387,7 +400,7 @@ export default {
       this.selectedColorMode = scene.getColorMode();
       this.integrator=scene.getIntegrator();this.speedMultiplier=scene.getSpeedMultiplier();const style=scene.getParticleStyle();this.particleSize=style.size;this.particleOpacity=style.opacity;
       this.updateBBox();
-      this.$nextTick(async()=>{let saved=null;try{saved=JSON.parse(localStorage.getItem('fieldplay-studio-current'));}catch(error){}if(saved)await this.restoreSnapshot(saved);else await this.applyMathField();this.publishOverlay();});
+      this.$nextTick(async()=>{let saved=null;const params=new URLSearchParams(location.search),sx=params.get('sx'),sy=params.get('sy');if(sx!==null&&sy!==null)saved={xExpression:sx,yExpression:sy,parameterText:params.get('sp')||''};else try{saved=JSON.parse(localStorage.getItem('fieldplay-studio-current'));}catch(error){}const hasField=params.has('vf');let compatible=!hasField;if(saved&&hasField){try{compatible=saved.code===this.vectorField.code||compileVectorField(saved.xExpression,saved.yExpression,parseParameters(saved.parameterText)).code===this.vectorField.code;}catch(error){compatible=false;}}if(saved&&compatible)await this.restoreSnapshot(saved);else if(!hasField)await this.applyMathField();else{this.currentModel=null;bus.fire('studio-field-model',null);this.mathError='This URL contains an Advanced GLSL field. Apply equations to enable mathematical overlays.';}this.publishOverlay();});
     },
 
     updateBBox() {

@@ -49,7 +49,7 @@ vec4 get_color(vec2 p) {
       return `
 vec4 get_color(vec2 p) {
   vec2 velocity = get_velocity(p);
-  float speed = (length(velocity) - u_velocity_range[0])/(u_velocity_range[1] - u_velocity_range[0]);
+  float speed = (length(velocity) - u_velocity_range[0])/max(0.000001, u_velocity_range[1] - u_velocity_range[0]);
   return vec4(hsv2rgb(vec3(0.05 + (1. - speed) * 0.5, 0.9, 1.)), 1.0);
 }
 `

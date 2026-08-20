@@ -73,7 +73,8 @@ qs.onChange(function() {
 
 function getColorMode() {
   let colorMode = qs.get('cm');
-  return defined(colorMode) ? colorMode : defaults.colorMode;
+  let parsed = Number.parseInt(colorMode, 10);
+  return Number.isFinite(parsed) ? parsed : defaults.colorMode;
 }
 
 function setColorMode(colorMode) {
