@@ -9,6 +9,7 @@ import bus from './bus';
 import { initAutoMode } from './autoMode';
 import { createWallpaperMode } from './wallpaper';
 import { parseWallpaperOptions } from './wallpaper/parseWallpaperOptions';
+import { installFieldPlayBridge } from './integration/fieldplayBridge';
 
 var canvas = document.getElementById('scene');
 // Canvas may not be available in test run
@@ -30,6 +31,7 @@ function initVectorFieldApp(canvas) {
     var scene = initScene(gl);
     scene.start();
     window.scene = scene;
+    window.fieldPlayBridge = installFieldPlayBridge(scene);
     const wallpaperOptions = parseWallpaperOptions();
     if (wallpaperOptions.enabled) {
       document.body.classList.add('wallpaper-mode');

@@ -12,8 +12,12 @@
     <div v-if='webGLEnabled && !hideUI'>
       <vector-view v-if='vectorLinesEnabled'></vector-view>
       <ruler></ruler>
-      <a href='#' @click.prevent='aboutVisible = !aboutVisible' class='about-link' title='click to learn more about this website'>about...</a>
+      <studio-status :scene='scene'></studio-status>
       <div class='controls-container' :style='getControlsContainerStyle()' ref='controls'>
+        <header class='studio-header'>
+          <div><strong>FieldPlay</strong><span>Studio</span></div>
+          <button @click='aboutVisible = !aboutVisible' title='About FieldPlay'>?</button>
+        </header>
         <controls></controls>
         <settings :scene='scene'></settings>
         <div ref='left' class='left resize'></div>
@@ -33,11 +37,12 @@ import About from './components/About.vue';
 import bus from './lib/bus.js';
 import isSmallScreen from './lib/isSmallScreen.js';
 import VectorView from './components/VectorView.vue';
+import StudioStatus from './components/StudioStatus.vue';
 import config from './lib/config.js';
 import createDrag from './lib/utils/drag.js';
 import appState from './lib/appState.js';
 
-const MIN_SETTINGS_WIDTH = 395;
+const MIN_SETTINGS_WIDTH = 410;
 
 export default {
   name: 'app',
@@ -78,6 +83,7 @@ export default {
     Share,
     About,
     VectorView
+    ,StudioStatus
   },
   methods: {
     getControlsContainerStyle() {
@@ -108,21 +114,36 @@ export default {
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 
   border: 1px solid primary-border;
-  border-left: none;
+  border-right: none;
   border-top: none;
   overflow: hidden;
   flex-direction: column;
   display: flex;
+  right: 0;
+  backdrop-filter: blur(18px);
 
   .settings {
     flex: 1;
   }
 }
+.studio-header {
+  height: 58px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: white;
+  background: rgba(3, 10, 23, .96);
+  border-bottom: 1px solid #21334b;
+  strong { font-size: 20px; letter-spacing: -.4px; }
+  span { color: #58b9ff; margin-left: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; }
+  button { border: 1px solid #344b68; color: #9ec8ed; background: transparent; width: 28px; height: 28px; cursor: pointer; }
+}
 .resize {
   position: absolute;
 }
 .resize.left {
-  right: -2px;
+  left: -2px;
   height: 100%;
   width: 4px;
   cursor: ew-resize;
@@ -151,17 +172,7 @@ a.highlighted {
 .ui-container {
   position: absolute;
 }
-a.about-link {
-  position: absolute;
-  left: 7px;
-  bottom: 26px;
-}
-
 @media (max-width: small-screen) {
-  a.about-link {
-    bottom: 14px;
-  }
-
   .controls-container {
     width: 100%;
   }

@@ -1,16 +1,28 @@
 <template>
   <div class='settings' :class='{collapsed: settingsPanel.collapsed}'>
-    <div class='block vector-field'  v-if='vectorField'>
-      <div class='title'>Vector field <a class='reset-all' :class='{"syntax-visible": syntaxHelpVisible}' href='#' @click.prevent='syntaxHelpVisible = !syntaxHelpVisible' title='click to learn more about syntax'>syntax help</a></div>
+    <nav class='studio-tabs'>
+      <button v-for='tab in tabs' :key='tab' :class='{active: activeTab === tab}' @click='activeTab = tab'>{{tab}}</button>
+    </nav>
+    <div class='block vector-field' v-if='vectorField && activeTab === "Field"'>
+      <div class='title'>Vector field <a class='reset-all' :class='{"syntax-visible": syntaxHelpVisible}' href='#' @click.prevent='syntaxHelpVisible = !syntaxHelpVisible'>Syntax</a></div>
       <syntax v-if='syntaxHelpVisible' @close='syntaxHelpVisible = false'></syntax>
       <code-editor :model='vectorField'></code-editor>
+      <div class='preset-grid'>
+        <button v-for='preset in presets' :key='preset.name' @click='applyPreset(preset)'>{{preset.name}}</button>
+      </div>
+      <div class='gradient-builder'>
+        <div class='title small'>Gradient field</div>
+        <p>Enter a scalar GLSL expression to visualize ∇f.</p>
+        <input type='text' v-model='scalarExpression' placeholder='sin(x) * cos(y)'>
+        <button type='button' @click='applyGradient'>Apply ∇f</button>
+      </div>
     </div>
     <div class='block' v-if='showBindings'>
       <Inputs :vm='inputsModel'></Inputs>
     </div>
-    <form class='block' @submit.prevent='onSubmit'>
+    <form class='block' v-show='activeTab === "Simulation" || activeTab === "Appearance"' @submit.prevent='onSubmit'>
       <div class='title'>Settings<a class='reset-all' href='?' title='set default settings'>reset all</a> </div>
-      <div class='row'>
+      <div class='row' v-show='activeTab === "Appearance"'>
         <div class='col'>Particle color</div>
         <div class='col'> 
           <select v-model='selectedColorMode' @change='changeColor'>
@@ -21,7 +33,7 @@
         </div>
         <help-icon @show='selectedColorHelp = !selectedColorHelp' :class='{open: selectedColorHelp}'></help-icon>
       </div>
-      <div class='row help' v-if='selectedColorHelp'>
+      <div class='row help' v-if='selectedColorHelp && activeTab === "Appearance"'>
         <div>
           <p>Defines background color for a vector field zone. Each particle entering into this zone wll be colored accordingly</p>
           <ul>
@@ -32,33 +44,33 @@
           <p>Default value is "Uniform"</p>
         </div>
       </div>
-      <div class='row' v-if='soundAvailable'>
+      <div class='row' v-if='soundAvailable && activeTab === "Appearance"'>
         <div class='col'>SoundCloud track</div>
         <div class='col'>
           <input type='text' v-model='soundCloudLink'>
           <a href='#' @click.prevent='loadSound'>load</a>
         </div>
       </div>
-      <div class='row' v-if='soundAvailable'>
+      <div class='row' v-if='soundAvailable && activeTab === "Appearance"'>
         <audio ref='player' controls='' autoplay='' preload autobuffer></audio>
       </div>
-      <div class='row'>
+      <div class='row' v-show='activeTab === "Simulation"'>
         <div class='col'>Particles count </div>
         <div class='col'><input type='number' :step='particleCountDelta' v-model='particlesCount' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
         <help-icon @show='particleCountHelpVisible = !particleCountHelpVisible' :class='{open: particleCountHelpVisible}'></help-icon>
       </div>
-      <div class='row help' v-if='particleCountHelpVisible'>
+      <div class='row help' v-if='particleCountHelpVisible && activeTab === "Simulation"'>
         <div>
           <p>How many particles should be visible inside bounding box? Higher values produce denser plots, smaller values are faster to compute.</p>
           <p>Recommended value is between <b>10,000</b> and <b>100,000</b></p>
         </div>
       </div>
-      <div class='row'>
+      <div class='row' v-show='activeTab === "Simulation"'>
         <div class='col'>Fade out speed</div>
         <div class='col'><input type='number' :step='fadeoutDelta'  v-model='fadeOutSpeed' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
         <help-icon @show='fadeoutDeltaHelp = !fadeoutDeltaHelp' :class='{open: fadeoutDeltaHelp}'></help-icon>
       </div>
-      <div class='row help' v-if='fadeoutDeltaHelp'>
+      <div class='row help' v-if='fadeoutDeltaHelp && activeTab === "Simulation"'>
         <div>
           <p>Before a particle is moved to the next position, we multiply its transparency by this number. This gives a fading out trace behind the particle</p>
           <ul>
@@ -68,12 +80,12 @@
           <p>Recommended value is <b>0.998</b></p>
         </div>
       </div>
-      <div class='row'>
+      <div class='row' v-show='activeTab === "Simulation"'>
         <div class='col'>Particle reset probability</div>
         <div class='col'><input type='number' :step='resetProbabilityDelta'  v-model='dropProbability' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
         <help-icon @show='resetProbabilityHelp = !resetProbabilityHelp' :class='{open: resetProbabilityHelp}'></help-icon>
       </div>
-      <div class='row help' v-if='resetProbabilityHelp'>
+      <div class='row help' v-if='resetProbabilityHelp && activeTab === "Simulation"'>
         <div>
           <p>This is a probability that a particle will reset its position to a random location inside bounding box. This prevents particles from flying out of the screen.</p>
           <ul>
@@ -83,12 +95,12 @@
           <p>Default value is <b>0.009</b></p>
         </div>
       </div>
-      <div class='row'>
+      <div class='row' v-show='activeTab === "Simulation"'>
         <div class='col'>Integration timestep</div>
         <div class='col'><input type='number' :step='integrationStepDelta' v-model='timeStep' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ></div>
         <help-icon @show='integrationStepHelp = !integrationStepHelp' :class='{open: integrationStepHelp}'></help-icon>
       </div>
-      <div class='row help' v-if='integrationStepHelp'>
+      <div class='row help' v-if='integrationStepHelp && activeTab === "Simulation"'>
         <div>
           <p>This parameter defines how fast time flies for each particle (or, to be more accurate, this is the integration step of the classical Runge-Kutta method)</p>
           <ul>
@@ -98,7 +110,7 @@
           <p>Default value is <b>0.01</b></p>
         </div>
       </div>
-      <div class='bounding-box'>
+      <div class='bounding-box' v-show='activeTab === "Simulation"'>
         <div class='col title'>bounds</div>
         <div class='row'>
           <div class='col  center'><input type='number' v-model.lazy='minY' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
@@ -113,6 +125,13 @@
         </div>
       </div>
     </form>
+    <section class='export-panel' v-show='activeTab === "Export"'>
+      <div class='title'>Share and embed</div>
+      <p>The current field and viewport already live in the URL. Copy it to share an exact scene.</p>
+      <button @click='copyShareLink'>{{copyLabel}}</button>
+      <button @click='downloadState'>Download state JSON</button>
+      <div class='bridge-note'><b>Embedding API ready</b><br><code>window.FieldPlay</code> exposes field, gradient, viewport, and subscription controls for a future Desmos overlay.</div>
+    </section>
   </div>
 </template>
 <script>
@@ -127,6 +146,8 @@ import Syntax from './help/Syntax.vue';
 import HelpIcon from './help/Icon.vue';
 import CodeEditor from './CodeEditor.vue';
 import Inputs from './Inputs.vue';
+import { createGradientFieldCode } from '../lib/integration/fieldplayBridge.js';
+import { STUDIO_PRESETS } from '../lib/studioPresets.js';
 
 // Temporary disable this until API is finished.
 const soundAvailable = config.isAudioEnabled;
@@ -152,6 +173,11 @@ export default {
   },
   data() {
     return {
+      tabs: ['Field', 'Appearance', 'Simulation', 'Export'],
+      activeTab: 'Field',
+      presets: STUDIO_PRESETS,
+      copyLabel: 'Copy share link',
+      scalarExpression: 'sin(x) * cos(y)',
       soundCloudLink: 'https://soundcloud.com/mrfijiwiji/yours-truly',
       vectorField: null,
       settingsPanel: appState.settingsPanel,
@@ -221,6 +247,23 @@ export default {
     }
   },
   methods: {
+    async applyPreset(preset) {
+      await this.vectorField.setCode(preset.code);
+      const cx=preset.center?.[0]||0, cy=preset.center?.[1]||0, half=preset.bounds/2;
+      this.scene.applyBoundingBox({minX:cx-half,maxX:cx+half,minY:cy-half,maxY:cy+half});
+    },
+    async copyShareLink() {
+      await navigator.clipboard.writeText(location.href);
+      this.copyLabel='Copied'; setTimeout(()=>this.copyLabel='Copy share link',1200);
+    },
+    downloadState() {
+      const blob=new Blob([JSON.stringify(window.FieldPlay.getState(),null,2)],{type:'application/json'});
+      const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='fieldplay-state.json'; link.click();
+      setTimeout(()=>URL.revokeObjectURL(link.href),0);
+    },
+    applyGradient() {
+      this.vectorField.setCode(createGradientFieldCode(this.scalarExpression));
+    },
     moveBoundingBox(key, value) {
       if (this.ignoreBbox) {
         return;
@@ -316,10 +359,34 @@ help-background = rgb(7, 12, 23);
   left: 0;
   overflow-y: auto;
   border-top: 1px solid secondary-text;
-  background: window-background;
+  background: rgba(3, 10, 23, .96);
   width: 100%;
   padding: 7px 7px 7px 7px;
 }
+.studio-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid #21334b;
+  margin: -7px -7px 16px;
+  button { padding: 12px 4px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #7893ad; cursor: pointer; }
+  button.active { color: #62c3ff; border-bottom-color: #42aaf5; }
+}
+.preset-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:12px; }
+.preset-grid button, .export-panel button { padding:8px 5px; border:1px solid #294563; background:#071526; color:#9ec8ed; cursor:pointer; }
+.preset-grid button:hover, .export-panel button:hover { border-color:#42aaf5; color:white; }
+.export-panel { color:#9ab6d2; }
+.export-panel p { font-size:13px; line-height:1.5; }
+.export-panel>button { width:100%; margin:0 0 8px; }
+.bridge-note { margin-top:14px; padding:12px; border-left:2px solid #42aaf5; background:#061121; font-size:12px; line-height:1.6; }
+.gradient-builder {
+  border-top: 1px solid #21334b;
+  margin-top: 14px;
+  padding-top: 14px;
+  p { font-size: 12px; line-height: 1.4; color: #7893ad; }
+  input { margin: 0 !important; border: 1px solid #2c4562 !important; background: #061121 !important; }
+  button { width: 100%; margin-top: 8px; padding: 9px; border: 1px solid #297ec1; color: white; background: #12558d; cursor: pointer; }
+}
+.title.small { font-size: 14px; }
 .settings.collapsed {
   display: none;
 }
