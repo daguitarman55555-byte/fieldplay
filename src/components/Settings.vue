@@ -74,6 +74,10 @@
         <label><input type='checkbox' v-model='overlay.isoclines' @change='publishOverlay'> Direction isoclines</label>
         <label><input type='checkbox' v-model='overlay.separatrices' @change='publishOverlay'> Separatrices</label>
         <label><input type='checkbox' v-model='overlay.integralLens' @change='publishOverlay'> Flux/circulation lens</label>
+        <label><input type='checkbox' v-model='overlay.pathIntegral' @change='publishOverlay'> Draw integral path</label>
+        <label><input type='checkbox' v-model='overlay.basins' @change='publishOverlay'> Attraction basins</label>
+        <label><input type='checkbox' v-model='overlay.autoStreamlines' @change='publishOverlay'> Even streamlines</label>
+        <p v-if='overlay.pathIntegral' class='analysis-hint'>Drag anywhere on the field to draw a path. Hold Shift while releasing to close it.</p>
         <label class='range-label'>Arrow density <input type='range' min='8' max='42' v-model.number='overlay.arrowDensity' @input='publishOverlay'></label>
         <label class='range-label'>Arrow scaling <select v-model='overlay.arrowScale' @change='publishOverlay'><option value='normalized'>Normalized</option><option value='linear'>Linear magnitude</option><option value='sqrt'>Square-root magnitude</option><option value='log'>Logarithmic magnitude</option></select></label>
         <label class='range-label'>Overlay opacity <input type='range' min='.15' max='1' step='.05' v-model.number='overlay.opacity' @input='publishOverlay'></label>
@@ -271,7 +275,7 @@ export default {
       parameterValues: {},
       mathError: '',
       mathWarnings:[],commandOpen:false,commandSearch:'',
-      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,lic:false,nullclines:false,isoclines:false,separatrices:false,integralLens:false,arrowDensity:22,arrowScale:'sqrt',opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,rangeMode:'percentile',rangeMin:0,rangeMax:1,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,contourLabels:true,contourFill:false,adaptiveContours:true,sampleQuality:'balanced',probe:true,trajectories:true,animateStreamlines:false,compareMode:'overlay',particlePalette:'cyan',particleColor:'#4ec4ff'},
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,lic:false,nullclines:false,isoclines:false,separatrices:false,integralLens:false,pathIntegral:false,basins:false,autoStreamlines:false,arrowDensity:22,arrowScale:'sqrt',opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,rangeMode:'percentile',rangeMin:0,rangeMax:1,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,contourLabels:true,contourFill:false,adaptiveContours:true,sampleQuality:'balanced',probe:true,trajectories:true,animateStreamlines:false,compareMode:'overlay',particlePalette:'cyan',particleColor:'#4ec4ff'},
       overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Contour lines'},{key:'critical',label:'Critical points'}],
       colorPalettes:PALETTE_OPTIONS,scalarPalettes:PALETTE_OPTIONS.filter(x=>x.type==='sequential'||x.type==='diverging'),functionDatabase:FUNCTION_DATABASE,functionHelp:FUNCTION_HELP,
       integrator:'rk4',speedMultiplier:1,performanceProfile:'balanced',particleSize:1.5,particleOpacity:1,particlePalette:'cyan',particleColor:'#4ec4ff',gradientStops:['#32105c','#00d9ff','#fff66d'],backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,animatedParameter:null,favoritePresets:JSON.parse(localStorage.getItem('fieldplay-favorites')||'[]'),
@@ -564,6 +568,7 @@ help-background = rgb(7, 12, 23);
 .overlay-controls .title { grid-column:1/-1; }
 .overlay-controls label { font-size:12px;color:#9ab6d2; }
 .overlay-controls .range-label { grid-column:1/-1;display:grid;grid-template-columns:110px 1fr;align-items:center; }
+.analysis-hint{grid-column:1/-1;margin:0;padding:7px;background:#10243a;border-left:2px solid #ffe154;color:#b9d6ef;font:11px/1.4 ui-monospace,monospace}
 .studio-simulation-controls { display:grid;gap:9px;margin:16px 0;padding:12px;background:#061121;border:1px solid #21334b; }
 .studio-simulation-controls label { display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:8px;font-size:12px;color:#9ab6d2; }
 .studio-simulation-controls input[type='color'] { width:100%;height:28px;background:transparent;border:1px solid #294563; }
