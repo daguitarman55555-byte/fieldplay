@@ -1,5 +1,5 @@
 import { describe,expect,it } from 'vitest';
-import { compileExpression,compileGradientField,compileVectorField,parseExpression,parseParameters } from './expression';
+import { compileExpression,compileGradientField,compileVectorField,expandUserFunctions,parseExpression,parseParameters,parseUserFunctions } from './expression';
 describe('math expressions',()=>{
   it('respects precedence and exponentiation',()=>{const f=compileExpression('2*x^2 + sin(y)');expect(f.evaluate(3,0)).toBe(18);expect(f.glsl).toContain('pow(x, 2.0)');});
   it('accepts Desmos-style implicit multiplication',()=>{expect(compileExpression('2x + 3sin(y)').evaluate(4,Math.PI/2)).toBe(11);expect(compileExpression('(x+1)(y-1)').evaluate(2,3)).toBe(6);});
@@ -12,4 +12,7 @@ describe('math expressions',()=>{
   it('supports hyperbolic, logarithmic, reciprocal, and utility functions',()=>{expect(compileExpression('sinh(0)+cosh(0)+log10(100)+sec(0)+hypot(3,4)').evaluate(0,0)).toBeCloseTo(9);expect(compileExpression('clamp(5,0,2)+root(27,3)').evaluate(0,0)).toBeCloseTo(5);});
   it('supports mathematical constants',()=>expect(compileExpression('tau+phi+sqrt2+ln2').evaluate(0,0)).toBeCloseTo(Math.PI*2+(1+Math.sqrt(5))/2+Math.SQRT2+Math.LN2));
   it('reports incorrect function arity',()=>expect(()=>compileExpression('sin(1,2)')).toThrow('expects 1 argument'));
+  it('supports polar coordinates and time',()=>{const f=compileExpression('r*cos(theta)+t');expect(f.evaluate(3,4,2)).toBeCloseTo(5);expect(compileVectorField('r','theta+t').code).toContain('float t = frame');});
+  it('supports piecewise comparisons',()=>{expect(compileExpression('piecewise(lt(x,0),-x,x)').evaluate(-3,0)).toBe(3);expect(compileExpression('between(x,-1,1)').evaluate(.5,0)).toBe(1);});
+  it('expands simple user-defined functions',()=>{const defs=parseUserFunctions('f(u,v)=sin(u)+v');expect(expandUserFunctions('f(x,y)',defs)).toContain('sin((x))');expect(compileVectorField('f(x,y)','0',{},'f(u,v)=u*v').evaluate(2,3)[0]).toBe(6);});
 });

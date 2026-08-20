@@ -7,14 +7,16 @@
         <label><span>dx/dt</span><math-expression-input v-model='xExpression' label='x velocity equation' @enter='applyMathField'/></label>
         <label><span>dy/dt</span><math-expression-input v-model='yExpression' label='y velocity equation' @enter='applyMathField'/></label>
         <label><span>Parameters</span><input v-model='parameterText' placeholder='a=1, b=0.25' @keyup.enter='applyMathField'></label>
+        <label><span>Functions</span><input v-model='functionDefinitions' placeholder='f(u,v)=sin(u)+cos(v)' @keyup.enter='applyMathField'></label>
         <div class='parameter-control' v-for='(value, name) in parameterValues' :key='name'>
           <span>{{name}}</span><input type='range' min='-10' max='10' step='.01' :value='value' @input='updateParameter(name, $event.target.value)'><output>{{Number(value).toFixed(2)}}</output>
         </div>
         <button @click='applyMathField'>Apply equations</button>
         <p class='math-error' v-if='mathError'>{{mathError}}</p>
+        <ul class='math-warnings' v-if='mathWarnings.length'><li v-for='warning in mathWarnings' :key='warning'>{{warning}}</li></ul>
       </div>
       <syntax v-if='syntaxHelpVisible' @close='syntaxHelpVisible = false'></syntax>
-      <details class='function-database'><summary>Supported functions ({{functionDatabase.length}})</summary><p>{{functionDatabase.join(', ')}}</p><p>Constants: π/pi, e, tau, phi, sqrt2, ln2, ln10.</p></details>
+      <details class='function-database'><summary>Function reference ({{functionDatabase.length}})</summary><p class='function-list'>{{functionDatabase.join(', ')}}</p><dl><template v-for='(description,name) in functionHelp' :key='name'><dt>{{name}}</dt><dd>{{description}}</dd></template></dl><p>Variables: x, y, r, theta, t. Constants: π/pi, e, tau, phi, sqrt2, ln2, ln10.</p></details>
       <details class='advanced-code'><summary>Developer mode — advanced GLSL</summary>
       <code-editor :model='vectorField'></code-editor>
       </details>
@@ -68,6 +70,7 @@
         <div class='title small'>Visualization layers</div>
         <label v-for='item in overlayToggles' :key='item.key'><input type='checkbox' v-model='overlay[item.key]' @change='publishOverlay'> {{item.label}}</label>
         <label class='range-label'>Arrow density <input type='range' min='8' max='42' v-model.number='overlay.arrowDensity' @input='publishOverlay'></label>
+        <label class='range-label'>Arrow scaling <select v-model='overlay.arrowScale' @change='publishOverlay'><option value='normalized'>Normalized</option><option value='linear'>Linear magnitude</option><option value='sqrt'>Square-root magnitude</option><option value='log'>Logarithmic magnitude</option></select></label>
         <label class='range-label'>Overlay opacity <input type='range' min='.15' max='1' step='.05' v-model.number='overlay.opacity' @input='publishOverlay'></label>
         <label>Arrow colors <select v-model='overlay.palette' @change='publishOverlay'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option></select></label>
         <label class='match-colors'><input type='checkbox' v-model='overlay.matchParticles' @change='publishOverlay'> Match particle colors</label>
@@ -76,9 +79,13 @@
         <label v-if='overlay.contours' class='range-label'><span><input type='checkbox' v-model='overlay.linkContourDensity' @change='publishOverlay'> Link contour density</span><output>{{effectiveContourLevels}} levels</output></label>
         <label v-if='overlay.contours && !overlay.linkContourDensity' class='range-label'>Contour levels <input type='range' min='3' max='24' v-model.number='overlay.contourLevels' @input='publishOverlay'><output>{{overlay.contourLevels}}</output></label>
         <label v-if='overlay.contours' class='range-label'>Contour smoothing <input type='range' min='0' max='2' step='1' v-model.number='overlay.contourSmoothing' @input='publishOverlay'><output>{{overlay.contourSmoothing}}</output></label>
+        <label v-if='overlay.contours'><input type='checkbox' v-model='overlay.contourLabels' @change='publishOverlay'> Contour labels</label>
+        <label v-if='overlay.contours'><input type='checkbox' v-model='overlay.contourFill' @change='publishOverlay'> Filled contour bands</label>
+        <label v-if='overlay.contours'><input type='checkbox' v-model='overlay.adaptiveContours' @change='publishOverlay'> Adaptive contour detail</label>
         <label class='range-label'>Analysis quality <select v-model='overlay.sampleQuality' @change='publishOverlay'><option value='eco'>Eco</option><option value='balanced'>Balanced</option><option value='detail'>Detail</option></select></label>
         <label><input type='checkbox' v-model='overlay.probe' @change='publishOverlay'> Hover probe</label>
         <label><input type='checkbox' v-model='overlay.trajectories' @change='publishOverlay'> Click trajectories</label>
+        <label v-if='overlay.trajectories'><input type='checkbox' v-model='overlay.animateStreamlines' @change='publishOverlay'> Animate streamlines</label>
         <button v-if='overlay.trajectories' class='clear-analysis' type='button' @click='clearTrajectories'>Clear trajectories</button>
       </div>
       <div class='row' v-if='soundAvailable'>
@@ -170,21 +177,23 @@
         </div>
       </div>
     </form>
-    <section id='projects' class='project-panel panel-section'>
-      <div class='title'>Projects and history</div>
-      <div class='history-buttons'><button @click='undo'>Undo</button><button @click='redo'>Redo</button><button @click='downloadPNG'>Export PNG</button></div>
+    <details id='projects' class='project-panel panel-section'>
+      <summary class='title'>Projects and history</summary>
+      <div class='history-buttons'><button @click='undo'>Undo</button><button @click='redo'>Redo</button><button @click='downloadPNG'>PNG</button><button @click='downloadSVG'>SVG</button></div>
       <div class='save-project'><input v-model='projectName' placeholder='Project name'><button @click='saveCurrentProject'>Save</button></div>
       <div class='saved-project' v-for='project in savedProjects' :key='project.name'><span>{{project.name}}</span><button @click='loadProject(project)'>Load</button><button @click='compareProject(project)'>Compare</button><button @click='removeProject(project.name)'>×</button></div>
       <label class='import-project'>Import project JSON<input type='file' accept='.json,application/json' @change='importProject'></label>
       <button v-if='comparisonActive' @click='clearComparison'>Clear comparison</button>
-    </section>
-    <section class='export-panel'>
-      <div class='title'>Share and embed</div>
+      <label v-if='comparisonActive'>Comparison <select v-model='overlay.compareMode' @change='publishOverlay'><option value='overlay'>Overlay</option><option value='difference'>Difference</option><option value='split'>Split view</option></select></label>
+    </details>
+    <details class='export-panel panel-section'>
+      <summary class='title'>Share and export</summary>
       <p>The current field and viewport already live in the URL. Copy it to share an exact scene.</p>
       <button @click='copyShareLink'>{{copyLabel}}</button>
       <button @click='downloadState'>Download state JSON</button>
       <div class='bridge-note'><b>Embedding API ready</b><br><code>window.FieldPlay</code> exposes field, gradient, viewport, and subscription controls for a future Desmos overlay.</div>
-    </section>
+    </details>
+    <div v-if='commandOpen' class='command-backdrop' @click.self='commandOpen=false'><div class='command-palette'><input ref='commandSearch' v-model='commandSearch' placeholder='Type a command…' @keydown.esc='commandOpen=false'><button v-for='command in filteredCommands' :key='command.label' @click='runCommand(command)'><span>{{command.label}}</span><kbd>{{command.key||''}}</kbd></button></div></div>
   </div>
 </template>
 <script>
@@ -200,7 +209,7 @@ import HelpIcon from './help/Icon.vue';
 import CodeEditor from './CodeEditor.vue';
 import Inputs from './Inputs.vue';
 import MathExpressionInput from './MathExpressionInput.vue';
-import { compileGradientField, compileVectorField, parseParameters, FUNCTION_DATABASE } from '../lib/math/expression.js';
+import { compileGradientField, compileVectorField, parseParameters, FUNCTION_DATABASE, FUNCTION_HELP } from '../lib/math/expression.js';
 import { PALETTE_OPTIONS, PALETTES, paletteShader } from '../lib/colorPalettes.js';
 import { STUDIO_PRESETS } from '../lib/studioPresets.js';
 import { createAdaptiveQuality } from '../lib/wallpaper/adaptiveQuality.js';
@@ -230,7 +239,7 @@ export default {
     if (this.scene) this.onSceneReady(this.scene);
 
     if (soundAvailable) this.soundLoader = new SoundLoader(this.$refs.player);
-    this.onHistoryKey=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?this.redo():this.undo();}};document.addEventListener('keydown',this.onHistoryKey);
+    this.onHistoryKey=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();this.commandOpen=!this.commandOpen;this.$nextTick(()=>this.$refs.commandSearch?.focus());return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?this.redo():this.undo();}};document.addEventListener('keydown',this.onHistoryKey);
   },
   beforeUnmount() {
     bus.off('scene-ready', this.onSceneReady, this);
@@ -249,11 +258,13 @@ export default {
       xExpression: '0.1*y',
       yExpression: '-0.2*y',
       parameterText: '',
+      functionDefinitions:'',
       parameterValues: {},
       mathError: '',
-      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,sampleQuality:'balanced',probe:true,trajectories:true,particlePalette:'cyan',particleColor:'#4ec4ff'},
+      mathWarnings:[],commandOpen:false,commandSearch:'',
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,arrowScale:'sqrt',opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,contourLabels:true,contourFill:false,adaptiveContours:true,sampleQuality:'balanced',probe:true,trajectories:true,animateStreamlines:false,compareMode:'overlay',particlePalette:'cyan',particleColor:'#4ec4ff'},
       overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Contour lines'},{key:'critical',label:'Critical points'}],
-      colorPalettes:PALETTE_OPTIONS,scalarPalettes:PALETTE_OPTIONS.filter(x=>x.type==='sequential'||x.type==='diverging'),functionDatabase:FUNCTION_DATABASE,
+      colorPalettes:PALETTE_OPTIONS,scalarPalettes:PALETTE_OPTIONS.filter(x=>x.type==='sequential'||x.type==='diverging'),functionDatabase:FUNCTION_DATABASE,functionHelp:FUNCTION_HELP,
       integrator:'rk4',speedMultiplier:1,performanceProfile:'balanced',particleSize:1.5,particleOpacity:1,particlePalette:'cyan',particleColor:'#4ec4ff',backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,
       history:createHistory(),projectName:'My field',savedProjects:listProjects(),comparisonActive:false,restoring:false,
       soundCloudLink: 'https://soundcloud.com/mrfijiwiji/yours-truly',
@@ -310,6 +321,8 @@ export default {
     maxY(newValue) { this.moveBoundingBox('maxY', newValue) },
   },
   computed: {
+    commands(){return[{label:'Apply equations',action:()=>this.applyMathField(),key:'Enter'},{label:'Random field',action:()=>this.randomizeStudioField()},{label:'Fit viewport',action:()=>this.scene.resetBoundingBox()},{label:'Toggle arrows',action:()=>{this.overlay.arrows=!this.overlay.arrows;this.publishOverlay();}},{label:'Toggle contours',action:()=>{this.overlay.contours=!this.overlay.contours;this.publishOverlay();}},{label:'Toggle heatmap',action:()=>{this.overlay.heatmap=!this.overlay.heatmap;this.publishOverlay();}},{label:'Clear trajectories',action:()=>this.clearTrajectories()},{label:'Export SVG',action:()=>this.downloadSVG()},{label:'Export PNG',action:()=>this.downloadPNG()}];},
+    filteredCommands(){const q=this.commandSearch.toLowerCase();return this.commands.filter(x=>x.label.toLowerCase().includes(q));},
     effectiveContourLevels(){return this.overlay.linkContourDensity?3+Math.round((this.overlay.arrowDensity-8)/34*21):this.overlay.contourLevels;},
     filteredPresets() {
       const query=this.presetSearch.trim().toLowerCase();
@@ -344,11 +357,13 @@ export default {
     },
     randomizeStudioField(){const preset=this.presets[Math.floor(Math.random()*this.presets.length)];this.applyPreset(preset);},
     async applyMathField() {
-      try { const parameters=parseParameters(this.parameterText);this.parameterValues={...parameters};const model=compileVectorField(this.xExpression,this.yExpression,parameters);const result=await this.vectorField.setCode(model.code);if(result?.error)throw new Error(result.error.error||result.error.message||'Shader compilation failed');this.mathError='';this.currentModel=model;bus.fire('studio-field-model',model);if(!this.restoring)this.history.push(this.projectSnapshot());this.persistStudioState();return model; } catch(error){this.mathError=error.message||String(error);return null;}
+      try { const parameters=parseParameters(this.parameterText);this.parameterValues={...parameters};const model=compileVectorField(this.xExpression,this.yExpression,parameters,this.functionDefinitions);const result=await this.vectorField.setCode(model.code);if(result?.error)throw new Error(result.error.error||result.error.message||'Shader compilation failed');this.mathError='';this.mathWarnings=[...new Set(model.warnings)];this.currentModel=model;bus.fire('studio-field-model',model);if(!this.restoring)this.history.push(this.projectSnapshot());this.persistStudioState();return model; } catch(error){this.mathError=error.message||String(error);return null;}
     },
     updateParameter(name,value){this.parameterValues[name]=Number(value);this.parameterText=Object.entries(this.parameterValues).map(([key,val])=>`${key}=${val}`).join(', ');this.applyMathField();},
     publishOverlay(){bus.fire('studio-overlay-options',{...this.overlay});this.queuePersist();},
     clearTrajectories(){bus.fire('studio-clear-trajectories');},
+    runCommand(command){this.commandOpen=false;this.commandSearch='';command.action();},
+    downloadSVG(){bus.fire('studio-export-svg');},
     applySimulation(){this.scene.setIntegrator(this.integrator);this.scene.setSpeedMultiplier(this.speedMultiplier);this.queuePersist();},
     applyPerformanceProfile(){const profiles={eco:{particles:12000,integrator:'midpoint',density:14},balanced:{particles:25000,integrator:'rk4',density:22},detail:{particles:50000,integrator:'rk4',density:30}},profile=profiles[this.performanceProfile];if(!profile)return;this.particlesCount=profile.particles;this.integrator=profile.integrator;this.overlay.arrowDensity=profile.density;this.applySimulation();this.publishOverlay();},
     applySpawn(){this.scene.setSeed(this.seed);this.scene.setSpawnMode(this.spawnMode);this.persistStudioState();},
@@ -357,7 +372,7 @@ export default {
     applyParticleColor(){this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader('custom',this.particleColor));this.overlay.particlePalette='custom';this.overlay.particleColor=this.particleColor;this.publishOverlay();this.queuePersist();},
     applyBackground(){this.scene.setBackgroundColor(hexColor(this.backgroundColor));this.queuePersist();},
     toggleAdaptive(){if(this.adaptiveController){this.adaptiveController.dispose();this.adaptiveController=null;}if(this.adaptiveEnabled)this.adaptiveController=createAdaptiveQuality({scene:this.scene,quality:'auto',maxParticles:100000,onChange:count=>{this.particlesCount=count;}});},
-    projectSnapshot(){return{version:3,name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,performanceProfile:this.performanceProfile,seed:this.seed,spawnMode:this.spawnMode},appearance:{particlePalette:this.particlePalette,particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
+    projectSnapshot(){return{version:4,name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,functionDefinitions:this.functionDefinitions,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,performanceProfile:this.performanceProfile,seed:this.seed,spawnMode:this.spawnMode},appearance:{particlePalette:this.particlePalette,particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
     async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,performanceProfile:snapshot.simulation.performanceProfile||'custom',seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};if(!snapshot.version&&this.overlay.palette==='cyan')this.overlay.palette='magnitude';this.applyParticleStyle();this.applyParticlePalette();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
     persistStudioState(){if(this.scene&&!this.restoring)try{const snapshot=this.projectSnapshot();snapshot.code=this.currentModel?.code;localStorage.setItem('fieldplay-studio-current',JSON.stringify(snapshot));const url=new URL(location.href);url.searchParams.set('sx',this.xExpression);url.searchParams.set('sy',this.yExpression);if(this.parameterText)url.searchParams.set('sp',this.parameterText);else url.searchParams.delete('sp');history.replaceState(null,'',url);}catch(error){}},
     queuePersist(){if(this.restoring||!this.scene)return;clearTimeout(this.persistTimer);this.persistTimer=setTimeout(()=>this.persistStudioState(),180);},
@@ -365,7 +380,7 @@ export default {
     saveCurrentProject(){this.savedProjects=saveProject(this.projectSnapshot());},
     async loadProject(project){this.projectName=project.name;await this.restoreSnapshot(project);this.history.push(project);},
     removeProject(name){this.savedProjects=deleteProject(name);},
-    compareProject(project){try{const model=compileVectorField(project.xExpression,project.yExpression,parseParameters(project.parameterText));bus.fire('studio-compare-model',model);this.comparisonActive=true;}catch(error){this.mathError=error.message;}},
+    compareProject(project){try{const model=compileVectorField(project.xExpression,project.yExpression,parseParameters(project.parameterText),project.functionDefinitions||'');bus.fire('studio-compare-model',model);this.comparisonActive=true;}catch(error){this.mathError=error.message;}},
     clearComparison(){bus.fire('studio-compare-model',null);this.comparisonActive=false;},
     async importProject(event){const file=event.target.files?.[0];if(!file)return;try{const project=JSON.parse(await file.text());if(!project.xExpression||!project.yExpression)throw new Error('Not a FieldPlay Studio project');this.projectName=project.name||file.name.replace(/\.json$/,'');await this.restoreSnapshot(project);this.savedProjects=saveProject(this.projectSnapshot());}catch(error){this.mathError=error.message;}event.target.value='';},
     downloadPNG(){const canvases=[...document.querySelectorAll('canvas')];const out=document.createElement('canvas');out.width=innerWidth*(devicePixelRatio||1);out.height=innerHeight*(devicePixelRatio||1);const ctx=out.getContext('2d');ctx.scale(devicePixelRatio||1,devicePixelRatio||1);canvases.forEach(canvas=>ctx.drawImage(canvas,parseFloat(canvas.style.left)||0,parseFloat(canvas.style.top)||0,innerWidth,innerHeight));const link=document.createElement('a');link.download='fieldplay.png';link.href=out.toDataURL('image/png');link.click();},
@@ -529,6 +544,7 @@ help-background = rgb(7, 12, 23);
 .preset-search { box-sizing:border-box;margin:10px 0 0 !important;border:1px solid #2c4562 !important;background:#061121 !important; }
 .math-editor button { padding:9px;border:1px solid #297ec1;color:white;background:#12558d;cursor:pointer; }
 .math-error { color:#ff8f9b;font:12px/1.4 ui-monospace,monospace;margin:3px 0; }
+.math-warnings{margin:2px 0;padding:7px 7px 7px 23px;background:#2b2110;color:#ffd38a;font:11px/1.45 ui-monospace,monospace;border-left:2px solid #ffb454}.function-database dl{display:grid;grid-template-columns:70px 1fr;gap:4px 7px;font-size:11px}.function-database dt{color:#62c7ff;font-family:ui-monospace,monospace}.function-database dd{margin:0;color:#9ab6d2}.function-list{font:10px/1.5 ui-monospace,monospace;color:#7893ad;overflow-wrap:anywhere}
 .advanced-code { border-top:1px solid #21334b;padding-top:8px; }
 .advanced-code summary { cursor:pointer;color:#7893ad;font-size:12px; }
 .overlay-controls { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0;padding:12px;background:#061121;border:1px solid #21334b; }
@@ -539,6 +555,7 @@ help-background = rgb(7, 12, 23);
 .studio-simulation-controls label { display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:8px;font-size:12px;color:#9ab6d2; }
 .studio-simulation-controls input[type='color'] { width:100%;height:28px;background:transparent;border:1px solid #294563; }
 .studio-simulation-controls .auto-quality { grid-template-columns:auto 1fr; }
+.command-backdrop{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.58);display:flex;align-items:flex-start;justify-content:center;padding-top:13vh}.command-palette{width:min(520px,88vw);max-height:60vh;overflow:auto;padding:10px;background:#071526;border:1px solid #426887;box-shadow:0 20px 70px #000}.command-palette input{box-sizing:border-box;width:100%;margin:0 0 8px!important;padding:12px!important;font-size:16px!important;background:#020a13!important;border:1px solid #365875!important;color:white!important}.command-palette button{width:100%;display:flex;justify-content:space-between;padding:10px;border:0;border-top:1px solid #152d44;background:transparent;color:#b9dafa;text-align:left;cursor:pointer}.command-palette button:hover{background:#11304b;color:white}.command-palette kbd{color:#6689a8}
 .title.small { font-size: 14px; }
 .settings.collapsed {
   display: none;

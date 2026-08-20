@@ -15,6 +15,8 @@ const FUNCTIONS={
   min:custom([2,16],Math.min,a=>foldGLSL('min',a)),max:custom([2,16],Math.max,a=>foldGLSL('max',a)),pow:def(2,Math.pow),mod:custom(2,(x,y)=>x-y*Math.floor(x/y),a=>`mod(${a[0]},${a[1]})`),
   hypot:custom([2,16],(...a)=>Math.hypot(...a),a=>`sqrt(${a.map(x=>`(${x})*(${x})`).join('+')})`),
   clamp:custom(3,(x,a,b)=>Math.min(b,Math.max(a,x)),a=>`clamp(${a.join(',')})`),mix:custom(3,(a,b,t)=>a+(b-a)*t,a=>`mix(${a.join(',')})`),lerp:alias('mix'),
+  select:custom(3,(condition,a,b)=>condition!==0?a:b,a=>`mix(${a[2]},${a[1]},step(0.5,abs(${a[0]})))`),piecewise:alias('select'),
+  lt:custom(2,(a,b)=>a<b?1:0,a=>`(1.0-step(${a[1]},${a[0]}))`),lte:custom(2,(a,b)=>a<=b?1:0,a=>`(1.0-step(${a[1]}+0.0000001,${a[0]}))`),gt:custom(2,(a,b)=>a>b?1:0,a=>`step(${a[1]}+0.0000001,${a[0]})`),gte:custom(2,(a,b)=>a>=b?1:0,a=>`step(${a[1]},${a[0]})`),eq:custom(2,(a,b)=>Math.abs(a-b)<1e-9?1:0,a=>`(1.0-step(0.000001,abs(${a[0]}-${a[1]})))`),between:custom(3,(x,a,b)=>x>=a&&x<=b?1:0,a=>`(step(${a[1]},${a[0]})*(1.0-step(${a[2]}+0.0000001,${a[0]})))`),
   step:custom(2,(edge,x)=>x<edge?0:1,a=>`step(${a.join(',')})`),smoothstep:custom(3,(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);},a=>`smoothstep(${a.join(',')})`),
   radians:custom(1,x=>x*Math.PI/180,a=>`radians(${a[0]})`),degrees:custom(1,x=>x*180/Math.PI,a=>`degrees(${a[0]})`),root:custom(2,(x,n)=>Math.sign(x)*Math.abs(x)**(1/n),a=>`(sign(${a[0]})*pow(abs(${a[0]}),1.0/(${a[1]})))`)
 };
@@ -53,30 +55,31 @@ export function parseExpression(source) {
 
 function isImplicitFactor(token){return token?.type==='number'||token?.type==='name'||(token?.type==='paren'&&token.value==='(');}
 
-export function compileExpression(source, parameters = {}) {
+export function compileExpression(source, parameters = {}, options={}) {
   const ast=parseExpression(source);
   const names=collectNames(ast);
-  names.forEach(name=>{if(name!=='x'&&name!=='y'&&!(name in CONSTANTS)&&!(name in parameters))throw syntax(`Unknown symbol: ${name}`);});
+  names.forEach(name=>{if(!['x','y','r','theta','t'].includes(name)&&!(name in CONSTANTS)&&!(name in parameters))throw syntax(`Unknown symbol: ${name}`);});
   return {
     ast,
     glsl: toGLSL(ast,parameters),
-    evaluate(x,y){return evaluate(ast,{x,y,...CONSTANTS,...parameters});}
+    warnings:expressionWarnings(source),
+    evaluate(x,y,t=options.time||0){return evaluate(ast,{x,y,r:Math.hypot(x,y),theta:Math.atan2(y,x),t,...CONSTANTS,...parameters});}
   };
 }
 
-export function compileVectorField(xSource,ySource,parameters={}){
-  const x=compileExpression(xSource,parameters),y=compileExpression(ySource,parameters);
+export function compileVectorField(xSource,ySource,parameters={},definitions=''){
+  const userFunctions=parseUserFunctions(definitions),expandedX=expandUserFunctions(xSource,userFunctions),expandedY=expandUserFunctions(ySource,userFunctions),x=compileExpression(expandedX,parameters),y=compileExpression(expandedY,parameters);
   return {
-    code:`vec2 get_velocity(vec2 p) {\n  float x = p.x;\n  float y = p.y;\n  return vec2(${x.glsl}, ${y.glsl});\n}`,
-    evaluate(px,py){return [x.evaluate(px,py),y.evaluate(px,py)];},
-    expressions:{x:String(xSource),y:String(ySource)},parameters:{...parameters}
+    code:`vec2 get_velocity(vec2 p) {\n  float x = p.x;\n  float y = p.y;\n  float r = length(p);\n  float theta = atan(y,x);\n  float t = frame * 0.016666667;\n  return vec2(${x.glsl}, ${y.glsl});\n}`,
+    evaluate(px,py,t=0){return [x.evaluate(px,py,t),y.evaluate(px,py,t)];},
+    expressions:{x:String(xSource),y:String(ySource)},expanded:{x:expandedX,y:expandedY},definitions:String(definitions||''),parameters:{...parameters},warnings:[...x.warnings,...y.warnings]
   };
 }
 
 export function compileGradientField(source,parameters={},epsilon=.001){
   const scalar=compileExpression(source,parameters),e=Math.min(.1,Math.max(.000001,Number(epsilon)||.001));
   return {
-    code:`float studio_scalar(vec2 p) {\n  float x = p.x;\n  float y = p.y;\n  return ${scalar.glsl};\n}\nvec2 get_velocity(vec2 p) {\n  float e = ${glslNumber(e)};\n  return vec2(studio_scalar(p+vec2(e,0.0))-studio_scalar(p-vec2(e,0.0)), studio_scalar(p+vec2(0.0,e))-studio_scalar(p-vec2(0.0,e))) / (2.0*e);\n}`,
+    code:`float studio_scalar(vec2 p) {\n  float x = p.x;\n  float y = p.y;\n  float r = length(p);\n  float theta = atan(y,x);\n  float t = frame * 0.016666667;\n  return ${scalar.glsl};\n}\nvec2 get_velocity(vec2 p) {\n  float e = ${glslNumber(e)};\n  return vec2(studio_scalar(p+vec2(e,0.0))-studio_scalar(p-vec2(e,0.0)), studio_scalar(p+vec2(0.0,e))-studio_scalar(p-vec2(0.0,e))) / (2.0*e);\n}`,
     evaluate(x,y){return [(scalar.evaluate(x+e,y)-scalar.evaluate(x-e,y))/(2*e),(scalar.evaluate(x,y+e)-scalar.evaluate(x,y-e))/(2*e)];},
     scalar:(x,y)=>scalar.evaluate(x,y),expression:String(source),parameters:{...parameters},epsilon:e
   };
@@ -89,6 +92,10 @@ export function parseParameters(source){
     output[match[1]]=Number(match[2]);
   }); return output;
 }
+
+export function parseUserFunctions(source){const functions={};String(source||'').split(/[;\n]+/).map(x=>x.trim()).filter(Boolean).forEach(line=>{const match=/^([A-Za-z_]\w*)\s*\(([^)]*)\)\s*=\s*(.+)$/.exec(line);if(!match)throw syntax(`Invalid function definition: ${line}`);const args=match[2].split(',').map(x=>x.trim()).filter(Boolean);if(!args.length||args.some(x=>!/^[A-Za-z_]\w*$/.test(x)))throw syntax(`Invalid function arguments: ${line}`);functions[match[1]]={args,body:match[3]};});return functions;}
+export function expandUserFunctions(source,functions){let result=String(source),changed=true,passes=0;while(changed&&passes++<12){changed=false;for(const[name,fn]of Object.entries(functions||{})){const re=new RegExp(`\\b${name}\\s*\\(([^()]*)\\)`,'g');result=result.replace(re,(whole,inside)=>{const values=splitArguments(inside);if(values.length!==fn.args.length)throw syntax(`${name} expects ${fn.args.length} arguments`);changed=true;let body=fn.body;fn.args.forEach((arg,i)=>{body=body.replace(new RegExp(`\\b${arg}\\b`,'g'),`(${values[i]})`);});return`(${body})`;});}}return result;}
+function splitArguments(text){const out=[];let depth=0,start=0;for(let i=0;i<text.length;i++){if(text[i]==='(')depth++;else if(text[i]===')')depth--;else if(text[i]===','&&depth===0){out.push(text.slice(start,i).trim());start=i+1;}}out.push(text.slice(start).trim());return out;}
 
 function tokenize(source){
   const tokens=[]; const text=String(source||''); let i=0;
@@ -127,4 +134,6 @@ function alias(name){return{alias:name};}
 function foldGLSL(name,args){return args.slice(1).reduce((value,arg)=>`${name}(${value},${arg})`,args[0]);}
 function resolveFunction(name){let canonical=name,fn=FUNCTIONS[canonical];while(fn?.alias){canonical=fn.alias;fn=FUNCTIONS[canonical];}return{...fn,name:canonical};}
 function validateArity(name,count){const fn=resolveFunction(name),range=Array.isArray(fn.arity)?fn.arity:[fn.arity,fn.arity];if(count<range[0]||count>range[1])throw syntax(`${name} expects ${range[0]===range[1]?range[0]:`${range[0]}–${range[1]}`} argument${range[1]===1?'':'s'}, received ${count}`);}
+export function expressionWarnings(source){const s=String(source),warnings=[];if(/sqrt\s*\(/i.test(s))warnings.push('sqrt is defined only when its input is nonnegative.');if(/(?:log|ln|log2|log10)\s*\(/i.test(s))warnings.push('Logarithms require a positive input.');if(/\/(?!\/)/.test(s))warnings.push('Division may create singularities where the denominator is zero.');if(/(?:tan|sec)\s*\(/i.test(s))warnings.push('tan/sec have periodic singularities.');return warnings;}
 export const FUNCTION_DATABASE=Object.freeze(Object.keys(FUNCTIONS));
+export const FUNCTION_HELP=Object.freeze({arctan:'arctan(x) or arctan(y,x) — inverse tangent',piecewise:'piecewise(condition, trueValue, falseValue)',between:'between(x,a,b) — 1 inside [a,b]',lt:'lt(a,b) — 1 when a<b',root:'root(x,n) — real nth root',hypot:'hypot(a,b,...) — Euclidean length',clamp:'clamp(x,min,max)',smoothstep:'smoothstep(min,max,x) — smooth transition'});

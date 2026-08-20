@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {buildFieldSVG} from './svgExport.js';
+describe('SVG field export',()=>{it('exports axes, arrows, contours and trajectories',()=>{const svg=buildFieldSVG({field:{evaluate:(x,y)=>[x,-y]},bounds:{minX:-1,maxX:1,minY:-1,maxY:1},width:400,height:300,options:{grid:true,axes:true,arrows:true,contours:true,contourLevels:3},trajectories:[{points:[[0,0],[1,1]],color:'#fff'}]});expect(svg).toContain('<svg');expect(svg).toContain('marker-end');expect(svg).toContain('stroke="#dcecff"');expect(svg).toContain('stroke-width="1.2"');});});

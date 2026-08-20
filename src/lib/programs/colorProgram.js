@@ -59,7 +59,9 @@ export default function colorProgram(ctx) {
   }
 
   function setColorMinMax(program) {
-    gl.uniform2f(program.u_velocity_range, velocityCounter.getMin(), velocityCounter.getMax());
+    let min=velocityCounter.getMin(),max=velocityCounter.getMax();
+    if(!Number.isFinite(min)||!Number.isFinite(max)||max<=min){min=0;max=1;}
+    gl.uniform2f(program.u_velocity_range, min, max);
   }
 
   function updateParticlesCount() {
@@ -105,7 +107,7 @@ export default function colorProgram(ctx) {
       var vx = readFloat(velocity_x, i);
       var vy = readFloat(velocity_y, i);
       var v = Math.sqrt(vx * vx + vy * vy);
-      velocityCounter.add(v);
+      if(Number.isFinite(v))velocityCounter.add(v);
     }
   }
 }
