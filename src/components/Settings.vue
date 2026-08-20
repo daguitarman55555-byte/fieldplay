@@ -1,6 +1,7 @@
 <template>
   <div class='settings' :class='{collapsed: settingsPanel.collapsed}'>
-    <div class='block vector-field' v-if='vectorField'>
+    <nav class='panel-jump' aria-label='Settings sections'><a href='#field-definition'>Field</a><a href='#visual-layers'>Layers</a><a href='#simulation'>Simulation</a><a href='#viewport'>View</a><a href='#projects'>Projects</a></nav>
+    <div id='field-definition' class='block vector-field panel-section' v-if='vectorField'>
       <div class='title'>Vector field <a class='reset-all' :class='{"syntax-visible": syntaxHelpVisible}' href='#' @click.prevent='syntaxHelpVisible = !syntaxHelpVisible'>Syntax</a></div>
       <div class='math-editor'>
         <label><span>dx/dt</span><math-expression-input v-model='xExpression' label='x velocity equation' @enter='applyMathField'/></label>
@@ -17,10 +18,10 @@
       <details class='advanced-code'><summary>Developer mode — advanced GLSL</summary>
       <code-editor :model='vectorField'></code-editor>
       </details>
-      <input class='preset-search' v-model='presetSearch' placeholder='Search field presets'>
-      <div class='preset-grid'>
-        <button v-for='preset in filteredPresets' :key='preset.name' @click='applyPreset(preset)'>{{preset.name}}</button>
-      </div>
+      <details class='preset-library'><summary>Field preset library ({{presets.length}})</summary>
+        <input class='preset-search' v-model='presetSearch' placeholder='Search field presets'>
+        <div class='preset-grid'><button v-for='preset in filteredPresets' :key='preset.name' @click='applyPreset(preset)'>{{preset.name}}</button></div>
+      </details>
       <div class='gradient-builder'>
         <div class='title small'>Gradient field</div>
         <p>Type an ordinary scalar equation to visualize its gradient ∇f.</p>
@@ -31,8 +32,8 @@
     <div class='block' v-if='showBindings'>
       <Inputs :vm='inputsModel'></Inputs>
     </div>
-    <form class='block' @submit.prevent='onSubmit'>
-      <div class='title'>Settings<a class='reset-all' href='?' title='set default settings'>reset all</a> </div>
+    <form id='visual-layers' class='block panel-section' @submit.prevent='onSubmit'>
+      <div class='title'>Appearance and analysis<a class='reset-all' href='?' title='set default settings'>reset all</a> </div>
       <div class='row'>
         <div class='col'>Particle color</div>
         <div class='col'> 
@@ -72,7 +73,8 @@
         <label class='match-colors'><input type='checkbox' v-model='overlay.matchParticles' @change='publishOverlay'> Match particle colors</label>
         <label v-if='overlay.heatmap'>Heatmap palette <select v-model='overlay.heatmapPalette' @change='publishOverlay'><option v-for='color in scalarPalettes' :key='color.value' :value='color.value'>{{color.label}}</option></select></label>
         <label v-if='overlay.contours' class='range-label'>Contour quantity <select v-model='overlay.contourQuantity' @change='publishOverlay'><option value='magnitude'>Vector magnitude |F|</option><option value='divergence'>Divergence ∇·F</option><option value='curl'>2D curl</option><option value='potential'>Scalar potential f</option></select></label>
-        <label v-if='overlay.contours' class='range-label'>Contour levels <input type='range' min='3' max='24' v-model.number='overlay.contourLevels' @input='publishOverlay'><output>{{overlay.contourLevels}}</output></label>
+        <label v-if='overlay.contours' class='range-label'><span><input type='checkbox' v-model='overlay.linkContourDensity' @change='publishOverlay'> Link contour density</span><output>{{effectiveContourLevels}} levels</output></label>
+        <label v-if='overlay.contours && !overlay.linkContourDensity' class='range-label'>Contour levels <input type='range' min='3' max='24' v-model.number='overlay.contourLevels' @input='publishOverlay'><output>{{overlay.contourLevels}}</output></label>
         <label v-if='overlay.contours' class='range-label'>Contour smoothing <input type='range' min='0' max='2' step='1' v-model.number='overlay.contourSmoothing' @input='publishOverlay'><output>{{overlay.contourSmoothing}}</output></label>
         <label class='range-label'>Analysis quality <select v-model='overlay.sampleQuality' @change='publishOverlay'><option value='eco'>Eco</option><option value='balanced'>Balanced</option><option value='detail'>Detail</option></select></label>
         <label><input type='checkbox' v-model='overlay.probe' @change='publishOverlay'> Hover probe</label>
@@ -82,6 +84,7 @@
       <div class='row' v-if='soundAvailable'>
         <audio ref='player' controls='' autoplay='' preload autobuffer></audio>
       </div>
+      <div id='simulation' class='section-heading'><span>Simulation and rendering</span><small>Motion, trails, speed, and performance</small></div>
       <div class='row'>
         <div class='col'>Particles count </div>
         <div class='col'><input type='number' :step='particleCountDelta' v-model='particlesCount' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
@@ -152,7 +155,7 @@
         <label>Spawn <select v-model='spawnMode' @change='applySpawn'><option value='random'>Random</option><option value='grid'>Grid</option><option value='ring'>Ring</option></select></label>
         <label class='auto-quality'><input type='checkbox' v-model='adaptiveEnabled' @change='toggleAdaptive'> Adaptive performance</label>
       </div>
-      <div class='bounding-box'>
+      <div id='viewport' class='bounding-box panel-subsection'>
         <div class='col title'>bounds</div>
         <div class='row'>
           <div class='col  center'><input type='number' v-model.lazy='minY' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
@@ -167,7 +170,7 @@
         </div>
       </div>
     </form>
-    <section class='project-panel'>
+    <section id='projects' class='project-panel panel-section'>
       <div class='title'>Projects and history</div>
       <div class='history-buttons'><button @click='undo'>Undo</button><button @click='redo'>Redo</button><button @click='downloadPNG'>Export PNG</button></div>
       <div class='save-project'><input v-model='projectName' placeholder='Project name'><button @click='saveCurrentProject'>Save</button></div>
@@ -248,7 +251,7 @@ export default {
       parameterText: '',
       parameterValues: {},
       mathError: '',
-      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,contourQuantity:'magnitude',contourLevels:9,contourSmoothing:1,sampleQuality:'balanced',probe:true,trajectories:true,particlePalette:'cyan',particleColor:'#4ec4ff'},
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,sampleQuality:'balanced',probe:true,trajectories:true,particlePalette:'cyan',particleColor:'#4ec4ff'},
       overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Contour lines'},{key:'critical',label:'Critical points'}],
       colorPalettes:PALETTE_OPTIONS,scalarPalettes:PALETTE_OPTIONS.filter(x=>x.type==='sequential'||x.type==='diverging'),functionDatabase:FUNCTION_DATABASE,
       integrator:'rk4',speedMultiplier:1,performanceProfile:'balanced',particleSize:1.5,particleOpacity:1,particlePalette:'cyan',particleColor:'#4ec4ff',backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,
@@ -307,6 +310,7 @@ export default {
     maxY(newValue) { this.moveBoundingBox('maxY', newValue) },
   },
   computed: {
+    effectiveContourLevels(){return this.overlay.linkContourDensity?3+Math.round((this.overlay.arrowDensity-8)/34*21):this.overlay.contourLevels;},
     filteredPresets() {
       const query=this.presetSearch.trim().toLowerCase();
       return query ? this.presets.filter(p=>`${p.name} ${p.x} ${p.y}`.toLowerCase().includes(query)) : this.presets;
@@ -487,6 +491,16 @@ help-background = rgb(7, 12, 23);
   width: 100%;
   padding: 7px 7px 7px 7px;
 }
+.panel-jump { position:sticky;top:-7px;z-index:8;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:-7px -7px 10px;padding:7px;background:rgba(3,10,23,.98);border-bottom:1px solid #21334b; }
+.panel-jump a { padding:7px 2px;color:#8fb8dc;text-align:center;text-decoration:none;font-size:11px;border:1px solid transparent;border-radius:3px; }
+.panel-jump a:hover,.panel-jump a:focus { color:white;background:#10263d;border-color:#365875; }
+.panel-section { scroll-margin-top:46px; }
+.panel-subsection { scroll-margin-top:52px; }
+.section-heading { margin:20px 0 10px;padding:11px 12px;border-left:3px solid #42aaf5;background:linear-gradient(90deg,#0a1c30,transparent);scroll-margin-top:52px; }
+.section-heading span { display:block;color:#e6f3ff;font-size:15px; }
+.section-heading small { display:block;margin-top:3px;color:#7893ad;font-size:11px; }
+.preset-library { margin-top:9px;border-top:1px solid #21334b;padding-top:8px; }
+.preset-library summary,.function-database summary { cursor:pointer;color:#9ab6d2;font-size:12px; }
 .preset-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:12px; }
 .preset-grid button, .export-panel button { padding:8px 5px; border:1px solid #294563; background:#071526; color:#9ec8ed; cursor:pointer; }
 .preset-grid button:hover, .export-panel button:hover { border-color:#42aaf5; color:white; }
