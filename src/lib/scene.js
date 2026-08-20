@@ -30,6 +30,7 @@ export default function initScene(gl) {
   var canvasRect = { width: 0, height: 0, top: 0, left: 0 };
   setWidthHeight(gl.canvas.width, gl.canvas.height);
   window.addEventListener('resize', onResize, true);
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   // Video capturing is available in super advanced mode. You'll need to install
   // and start https://github.com/greggman/ffmpegserver.js
@@ -110,6 +111,7 @@ export default function initScene(gl) {
   // Frame management
   var lastAnimationFrame;
   var isPaused = false;
+  var isHidden = document.hidden;
   var lastFrameError = null;
   var frameListeners = new Set();
   var suppressStateSaving = false;
@@ -138,6 +140,7 @@ export default function initScene(gl) {
     onFrame,
     getFrameCount: () => ctx.frame,
     getLastFrameError: () => lastFrameError,
+    getPaused: () => isPaused,
 
     getParticlesCount,
     setParticlesCount,
@@ -247,6 +250,12 @@ export default function initScene(gl) {
     nextFrame();
   }
 
+  function onVisibilityChange() {
+    isHidden = document.hidden;
+    if (isHidden) stop();
+    else nextFrame();
+  }
+
   // Main screen fade out configuration
   function setFadeOutSpeed(x, options = {}) {
     var f = parseFloat(x);
@@ -317,6 +326,7 @@ export default function initScene(gl) {
       stop();
       panzoom.dispose();
       window.removeEventListener('resize', onResize, true);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       cursorUpdater.dispose();
       vectorFieldEditorState.dispose();
       frameListeners.clear();
@@ -325,7 +335,7 @@ export default function initScene(gl) {
   function nextFrame() {
     if (lastAnimationFrame) return;
 
-    if (isPaused) return;
+    if (isPaused || isHidden) return;
 
     lastAnimationFrame = requestAnimationFrame(draw);
   }
