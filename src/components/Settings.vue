@@ -71,6 +71,7 @@
         <label v-for='item in overlayToggles' :key='item.key'><input type='checkbox' v-model='overlay[item.key]' @change='publishOverlay'> {{item.label}}</label>
         <label><input type='checkbox' v-model='overlay.lic' @change='publishOverlay'> Flow texture (LIC)</label>
         <label><input type='checkbox' v-model='overlay.nullclines' @change='publishOverlay'> Nullclines</label>
+        <label><input type='checkbox' v-model='overlay.isoclines' @change='publishOverlay'> Direction isoclines</label>
         <label><input type='checkbox' v-model='overlay.separatrices' @change='publishOverlay'> Separatrices</label>
         <label><input type='checkbox' v-model='overlay.integralLens' @change='publishOverlay'> Flux/circulation lens</label>
         <label class='range-label'>Arrow density <input type='range' min='8' max='42' v-model.number='overlay.arrowDensity' @input='publishOverlay'></label>
@@ -270,7 +271,7 @@ export default {
       parameterValues: {},
       mathError: '',
       mathWarnings:[],commandOpen:false,commandSearch:'',
-      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,lic:false,nullclines:false,separatrices:false,integralLens:false,arrowDensity:22,arrowScale:'sqrt',opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,rangeMode:'percentile',rangeMin:0,rangeMax:1,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,contourLabels:true,contourFill:false,adaptiveContours:true,sampleQuality:'balanced',probe:true,trajectories:true,animateStreamlines:false,compareMode:'overlay',particlePalette:'cyan',particleColor:'#4ec4ff'},
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,lic:false,nullclines:false,isoclines:false,separatrices:false,integralLens:false,arrowDensity:22,arrowScale:'sqrt',opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,rangeMode:'percentile',rangeMin:0,rangeMax:1,contourQuantity:'magnitude',contourLevels:9,linkContourDensity:true,contourSmoothing:1,contourLabels:true,contourFill:false,adaptiveContours:true,sampleQuality:'balanced',probe:true,trajectories:true,animateStreamlines:false,compareMode:'overlay',particlePalette:'cyan',particleColor:'#4ec4ff'},
       overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Contour lines'},{key:'critical',label:'Critical points'}],
       colorPalettes:PALETTE_OPTIONS,scalarPalettes:PALETTE_OPTIONS.filter(x=>x.type==='sequential'||x.type==='diverging'),functionDatabase:FUNCTION_DATABASE,functionHelp:FUNCTION_HELP,
       integrator:'rk4',speedMultiplier:1,performanceProfile:'balanced',particleSize:1.5,particleOpacity:1,particlePalette:'cyan',particleColor:'#4ec4ff',gradientStops:['#32105c','#00d9ff','#fff66d'],backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,animatedParameter:null,favoritePresets:JSON.parse(localStorage.getItem('fieldplay-favorites')||'[]'),
