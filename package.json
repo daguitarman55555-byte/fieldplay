@@ -8,7 +8,9 @@
     "dev": "vite --port 8880",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gate0": "vite --host 0.0.0.0 --port 8880 gate0.html",
+    "package:lively": "npm run build && node util/package-lively.mjs"
   },
   "dependencies": {
     "@ckpack/vue-color": "^1.5.0",

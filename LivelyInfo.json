@@ -1,0 +1,14 @@
+{
+  "AppVersion": "2.0.0.0",
+  "Title": "FieldPlay Cosmic Field",
+  "Thumbnail": null,
+  "Preview": null,
+  "Desc": "A responsive WebGL2 cosmic vector-field wallpaper with adaptive quality.",
+  "Author": "FieldPlay contributors",
+  "License": "MIT",
+  "Contact": "https://github.com/anvaka/fieldplay",
+  "Type": 1,
+  "FileName": "wallpaper.html",
+  "Arguments": "--system-information --audio --pause-event true",
+  "IsAbsolutePath": false
+}

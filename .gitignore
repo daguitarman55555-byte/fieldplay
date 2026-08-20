@@ -1,6 +1,8 @@
 .DS_Store
 node_modules/
+.npm-cache/
 dist/
+lively-package/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

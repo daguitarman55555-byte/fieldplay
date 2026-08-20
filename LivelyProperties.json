@@ -1,0 +1,40 @@
+{
+  "quality": {
+    "text": "Quality",
+    "type": "dropdown",
+    "value": 1,
+    "items": ["Eco", "Wallpaper", "Showcase"]
+  },
+  "targetFps": {
+    "text": "Target FPS",
+    "type": "dropdown",
+    "value": 1,
+    "items": ["20", "30", "60"]
+  },
+  "motion": {
+    "text": "Motion",
+    "type": "slider",
+    "value": 60,
+    "min": 0,
+    "max": 100,
+    "step": 1
+  },
+  "bloom": {
+    "text": "Bloom",
+    "type": "slider",
+    "value": 58,
+    "min": 0,
+    "max": 100,
+    "step": 1
+  },
+  "audioReactive": {
+    "text": "Audio reactivity",
+    "type": "checkbox",
+    "value": true
+  },
+  "runDiagnostics": {
+    "text": "Run diagnostics again",
+    "type": "button",
+    "value": false
+  }
+}

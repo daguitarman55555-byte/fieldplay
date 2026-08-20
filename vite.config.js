@@ -10,5 +10,15 @@ export default defineConfig({
   },
   server: { port: 8880, open: true },
   base: './',
-  build: { outDir: 'dist', sourcemap: true }
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    rollupOptions: {
+      input: {
+        fieldplay: path.resolve(__dirname, 'index.html'),
+        gate0: path.resolve(__dirname, 'gate0.html'),
+        wallpaper: path.resolve(__dirname, 'wallpaper.html')
+      }
+    }
+  }
 })
