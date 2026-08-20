@@ -19,6 +19,8 @@ npm run package:lively
 
 Import the generated `lively-package` folder into Lively. Its settings provide scene selection and automatic rotation; deterministic seeds; four palettes; Eco, Wallpaper, and Showcase quality profiles; 20/30/60 FPS targets; motion and bloom controls; and audio reactivity.
 
+For a no-code installation, open the latest successful **Build Lively package** run under the repository's Actions tab, download the `FieldPlay-Cosmic-Lively` artifact, unzip it, and drag the contained `lively-package` folder into Lively.
+
 The runtime pauses its animation clock when Lively pauses playback. Its quality controller reduces internal resolution and shader work after sustained frame misses or high whole-system GPU utilization.
 
 Run the hardware validation checklist in [GATE0_WINDOWS_TEST.md](./GATE0_WINDOWS_TEST.md) before treating a machine as supported.

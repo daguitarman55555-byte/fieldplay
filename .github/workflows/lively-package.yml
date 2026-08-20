@@ -1,0 +1,30 @@
+name: Build Lively package
+
+on:
+  push:
+    branches: [upgrade/gate0]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run package:lively
+      - name: Create installable archive
+        run: zip -r FieldPlay-Cosmic-Lively.zip lively-package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FieldPlay-Cosmic-Lively
+          path: FieldPlay-Cosmic-Lively.zip
+          if-no-files-found: error
+          retention-days: 30
