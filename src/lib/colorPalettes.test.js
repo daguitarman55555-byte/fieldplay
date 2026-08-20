@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {paletteColor,paletteShader,PALETTE_OPTIONS} from './colorPalettes.js';
+describe('scientific palettes',()=>{it('includes sequential, diverging, cyclic and solid choices',()=>{expect(new Set(PALETTE_OPTIONS.map(x=>x.type))).toEqual(new Set(['sequential','diverging','cyclic','solid']));});it('interpolates finite CSS colors',()=>expect(paletteColor('viridis',.5,.8)).toMatch(/^rgba\(\d+,\d+,\d+,0.8\)$/));it('emits GLSL palette code',()=>expect(paletteShader('plasma')).toContain('return mix'));});

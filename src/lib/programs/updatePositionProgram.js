@@ -44,7 +44,7 @@ export default function updatePositionProgram(ctx) {
     if (updateProgram) updateProgram.unload();
     updateProgram = newProgram;
 
-    if (ctx.colorMode === ColorMode.VELOCITY) readVelocity.requestSpeedUpdate();
+    if (ctx.colorMode === ColorMode.VELOCITY || ctx.colorMode === ColorMode.CUSTOM) readVelocity.requestSpeedUpdate();
   }
   function setIntegrator(method) {
     particlePositionShaderCodeBuilder.setIntegrator(method);
@@ -73,7 +73,7 @@ export default function updatePositionProgram(ctx) {
 
   function prepareToDraw(program) {
     var colorMode = ctx.colorMode;
-    if (colorMode === ColorMode.VELOCITY) readVelocity.setColorMinMax(program);
+    if (colorMode === ColorMode.VELOCITY || colorMode === ColorMode.CUSTOM) readVelocity.setColorMinMax(program);
 
     readTextures.bindTextures(gl, program);
   }
@@ -118,7 +118,7 @@ export default function updatePositionProgram(ctx) {
 
     // TODO: I think I need to keep this time-bound, i.e. allocate X ms to
     // process particle positions, and move on. So that the rendering thread is not paused for too long
-    if (ctx.colorMode === ColorMode.VELOCITY) {
+    if (ctx.colorMode === ColorMode.VELOCITY || ctx.colorMode === ColorMode.CUSTOM) {
       readVelocity.updateParticlesPositions(program);
     }
 

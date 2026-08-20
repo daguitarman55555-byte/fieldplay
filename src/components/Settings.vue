@@ -13,6 +13,7 @@
         <p class='math-error' v-if='mathError'>{{mathError}}</p>
       </div>
       <syntax v-if='syntaxHelpVisible' @close='syntaxHelpVisible = false'></syntax>
+      <details class='function-database'><summary>Supported functions ({{functionDatabase.length}})</summary><p>{{functionDatabase.join(', ')}}</p><p>Constants: π/pi, e, tau, phi, sqrt2, ln2, ln10.</p></details>
       <details class='advanced-code'><summary>Developer mode — advanced GLSL</summary>
       <code-editor :model='vectorField'></code-editor>
       </details>
@@ -69,7 +70,14 @@
         <label class='range-label'>Overlay opacity <input type='range' min='.15' max='1' step='.05' v-model.number='overlay.opacity' @input='publishOverlay'></label>
         <label>Arrow colors <select v-model='overlay.palette' @change='publishOverlay'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option></select></label>
         <label class='match-colors'><input type='checkbox' v-model='overlay.matchParticles' @change='publishOverlay'> Match particle colors</label>
+        <label v-if='overlay.heatmap'>Heatmap palette <select v-model='overlay.heatmapPalette' @change='publishOverlay'><option v-for='color in scalarPalettes' :key='color.value' :value='color.value'>{{color.label}}</option></select></label>
         <label v-if='overlay.contours' class='range-label'>Contour quantity <select v-model='overlay.contourQuantity' @change='publishOverlay'><option value='magnitude'>Vector magnitude |F|</option><option value='divergence'>Divergence ∇·F</option><option value='curl'>2D curl</option><option value='potential'>Scalar potential f</option></select></label>
+        <label v-if='overlay.contours' class='range-label'>Contour levels <input type='range' min='3' max='24' v-model.number='overlay.contourLevels' @input='publishOverlay'><output>{{overlay.contourLevels}}</output></label>
+        <label v-if='overlay.contours' class='range-label'>Contour smoothing <input type='range' min='0' max='2' step='1' v-model.number='overlay.contourSmoothing' @input='publishOverlay'><output>{{overlay.contourSmoothing}}</output></label>
+        <label class='range-label'>Analysis quality <select v-model='overlay.sampleQuality' @change='publishOverlay'><option value='eco'>Eco</option><option value='balanced'>Balanced</option><option value='detail'>Detail</option></select></label>
+        <label><input type='checkbox' v-model='overlay.probe' @change='publishOverlay'> Hover probe</label>
+        <label><input type='checkbox' v-model='overlay.trajectories' @change='publishOverlay'> Click trajectories</label>
+        <button v-if='overlay.trajectories' class='clear-analysis' type='button' @click='clearTrajectories'>Clear trajectories</button>
       </div>
       <div class='row' v-if='soundAvailable'>
         <audio ref='player' controls='' autoplay='' preload autobuffer></audio>
@@ -189,7 +197,8 @@ import HelpIcon from './help/Icon.vue';
 import CodeEditor from './CodeEditor.vue';
 import Inputs from './Inputs.vue';
 import MathExpressionInput from './MathExpressionInput.vue';
-import { compileGradientField, compileVectorField, parseParameters } from '../lib/math/expression.js';
+import { compileGradientField, compileVectorField, parseParameters, FUNCTION_DATABASE } from '../lib/math/expression.js';
+import { PALETTE_OPTIONS, PALETTES, paletteShader } from '../lib/colorPalettes.js';
 import { STUDIO_PRESETS } from '../lib/studioPresets.js';
 import { createAdaptiveQuality } from '../lib/wallpaper/adaptiveQuality.js';
 import { createHistory, deleteProject, listProjects, saveProject } from '../lib/studioProjects.js';
@@ -239,9 +248,9 @@ export default {
       parameterText: '',
       parameterValues: {},
       mathError: '',
-      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.82,palette:'magnitude',matchParticles:false,contourQuantity:'magnitude',particlePalette:'cyan',particleColor:'#4ec4ff'},
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.82,palette:'magnitude',heatmapPalette:'viridis',matchParticles:false,contourQuantity:'magnitude',contourLevels:9,contourSmoothing:1,sampleQuality:'balanced',probe:true,trajectories:true,particlePalette:'cyan',particleColor:'#4ec4ff'},
       overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Contour lines'},{key:'critical',label:'Critical points'}],
-      colorPalettes:[{value:'magnitude',label:'Magnitude (blue → red)'},{value:'cyan',label:'Cyan'},{value:'blue',label:'Blue'},{value:'teal',label:'Teal'},{value:'green',label:'Green'},{value:'gold',label:'Gold'},{value:'orange',label:'Orange'},{value:'red',label:'Red'},{value:'pink',label:'Pink'},{value:'violet',label:'Violet'},{value:'white',label:'White'},{value:'rainbow',label:'Direction rainbow'}],
+      colorPalettes:PALETTE_OPTIONS,scalarPalettes:PALETTE_OPTIONS.filter(x=>x.type==='sequential'||x.type==='diverging'),functionDatabase:FUNCTION_DATABASE,
       integrator:'rk4',speedMultiplier:1,performanceProfile:'balanced',particleSize:1.5,particleOpacity:1,particlePalette:'cyan',particleColor:'#4ec4ff',backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,
       history:createHistory(),projectName:'My field',savedProjects:listProjects(),comparisonActive:false,restoring:false,
       soundCloudLink: 'https://soundcloud.com/mrfijiwiji/yours-truly',
@@ -335,11 +344,12 @@ export default {
     },
     updateParameter(name,value){this.parameterValues[name]=Number(value);this.parameterText=Object.entries(this.parameterValues).map(([key,val])=>`${key}=${val}`).join(', ');this.applyMathField();},
     publishOverlay(){bus.fire('studio-overlay-options',{...this.overlay});this.queuePersist();},
+    clearTrajectories(){bus.fire('studio-clear-trajectories');},
     applySimulation(){this.scene.setIntegrator(this.integrator);this.scene.setSpeedMultiplier(this.speedMultiplier);this.queuePersist();},
     applyPerformanceProfile(){const profiles={eco:{particles:12000,integrator:'midpoint',density:14},balanced:{particles:25000,integrator:'rk4',density:22},detail:{particles:50000,integrator:'rk4',density:30}},profile=profiles[this.performanceProfile];if(!profile)return;this.particlesCount=profile.particles;this.integrator=profile.integrator;this.overlay.arrowDensity=profile.density;this.applySimulation();this.publishOverlay();},
     applySpawn(){this.scene.setSeed(this.seed);this.scene.setSpawnMode(this.spawnMode);this.persistStudioState();},
     applyParticleStyle(){this.scene.setParticleStyle({size:this.particleSize,opacity:this.particleOpacity});this.queuePersist();},
-    applyParticlePalette(){if(this.particlePalette==='custom')return this.applyParticleColor();if(this.particlePalette==='magnitude'){this.selectedColorMode=2;this.scene.setColorMode(2);}else if(this.particlePalette==='rainbow'){this.selectedColorMode=3;this.scene.setColorMode(3);}else{this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader(this.particlePalette,this.particleColor));}this.overlay.particlePalette=this.particlePalette;this.publishOverlay();this.queuePersist();},
+    applyParticlePalette(){if(this.particlePalette==='custom')return this.applyParticleColor();if(this.particlePalette==='rainbow'){this.selectedColorMode=3;this.scene.setColorMode(3);}else{this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader(this.particlePalette,this.particleColor));}this.overlay.particlePalette=this.particlePalette;this.publishOverlay();this.queuePersist();},
     applyParticleColor(){this.selectedColorMode=4;this.scene.setColorFunction(particlePaletteShader('custom',this.particleColor));this.overlay.particlePalette='custom';this.overlay.particleColor=this.particleColor;this.publishOverlay();this.queuePersist();},
     applyBackground(){this.scene.setBackgroundColor(hexColor(this.backgroundColor));this.queuePersist();},
     toggleAdaptive(){if(this.adaptiveController){this.adaptiveController.dispose();this.adaptiveController=null;}if(this.adaptiveEnabled)this.adaptiveController=createAdaptiveQuality({scene:this.scene,quality:'auto',maxParticles:100000,onChange:count=>{this.particlesCount=count;}});},
@@ -454,11 +464,11 @@ function hex(x) {
   return value;
 }
 function hexColor(value) { const text=String(value||'#000000').replace('#','');return {r:parseInt(text.slice(0,2),16)/255,g:parseInt(text.slice(2,4),16)/255,b:parseInt(text.slice(4,6),16)/255,a:1}; }
-const SOLID_COLORS={cyan:'#4ec4ff',blue:'#4d96ff',teal:'#36d6bd',green:'#74d680',gold:'#ffbe54',orange:'#ff8a4c',red:'#fc6255',pink:'#ff6faf',violet:'#b273ff',white:'#e6f3ff'};
 function particlePaletteShader(name,custom){
-  if(name==='magnitude')return `vec3 studio_palette(float t){vec3 a=vec3(0.345,0.769,0.867),b=vec3(1.0,0.882,0.329),c=vec3(0.988,0.384,0.333);return t<0.65?mix(a,b,t/0.65):mix(b,c,(t-0.65)/0.35);} vec4 get_color(vec2 p){float s=clamp((length(get_velocity(p))-u_velocity_range.x)/max(0.000001,u_velocity_range.y-u_velocity_range.x),0.0,1.0);return vec4(studio_palette(s),1.0);}`;
   if(name==='rainbow')return `vec4 get_color(vec2 p){vec2 v=get_velocity(p);float h=(atan(v.y,v.x)+PI)/(2.0*PI);return vec4(hsv2rgb(vec3(h,0.82,1.0)),1.0);}`;
-  const {r,g,b}=hexColor(name==='custom'?custom:(SOLID_COLORS[name]||SOLID_COLORS.cyan));return `vec4 get_color(vec2 p){return vec4(${r.toFixed(4)},${g.toFixed(4)},${b.toFixed(4)},1.0);}`;
+  if(name==='custom'){const {r,g,b}=hexColor(custom);return `vec4 get_color(vec2 p){return vec4(${r.toFixed(4)},${g.toFixed(4)},${b.toFixed(4)},1.0);}`;}
+  if(PALETTES[name]?.type==='solid'){const {r,g,b}=hexColor(PALETTES[name].stops[0]);return `vec4 get_color(vec2 p){return vec4(${r.toFixed(4)},${g.toFixed(4)},${b.toFixed(4)},1.0);}`;}
+  return `vec3 studio_palette(float t){${paletteShader(name)}} vec4 get_color(vec2 p){float s=clamp((length(get_velocity(p))-u_velocity_range.x)/max(0.000001,u_velocity_range.y-u_velocity_range.x),0.0,1.0);return vec4(studio_palette(s),1.0);}`;
 }
 </script>
 

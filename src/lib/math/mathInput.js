@@ -5,5 +5,6 @@ export function normalizeMathInput(value){
 }
 
 export function expressionToLatex(value){
-  return String(value||'').replace(/\b(sin|cos|tan|asin|acos|atan|sqrt|abs|exp|log|floor|ceil|min|max)\b/g,'\\$1').replace(/\*/g,'\\cdot ');
+  const functions='arcsinh|arccosh|arctanh|smoothstep|arcsin|arccos|arctan|degrees|radians|log10|atan2|asinh|acosh|atanh|sinh|cosh|tanh|sqrt|cbrt|floor|ceil|round|trunc|fract|hypot|clamp|log2|logb|exp2|asin|acos|atan|sin|cos|tan|sec|csc|cot|abs|exp|log|ln|min|max|pow|mod|mix|lerp|step|sign|root';
+  return String(value||'').replace(new RegExp(`\\b(${functions})\\b`,'g'),name=>`\\operatorname{${name}}`).replace(/\*/g,'\\cdot ');
 }
