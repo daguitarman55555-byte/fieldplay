@@ -155,7 +155,7 @@
         <label>Speed <input type='range' min='0' max='4' step='.05' v-model.number='speedMultiplier' @input='applySimulation'><output>{{speedMultiplier.toFixed(2)}}×</output></label>
         <label>Particle size <input type='range' min='1' max='8' step='.25' v-model.number='particleSize' @input='applyParticleStyle'><output>{{particleSize}} px</output></label>
         <label>Particle opacity <input type='range' min='.05' max='1' step='.05' v-model.number='particleOpacity' @input='applyParticleStyle'><output>{{particleOpacity}}</output></label>
-        <label>Particle palette <select v-model='particlePalette' @change='applyParticlePalette'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option><option value='custom'>Custom color</option></select></label>
+        <label>Particle palette <select v-model='particlePalette' @change='applyParticlePalette'><option v-for='color in colorPalettes' :key='color.value' :value='color.value'>{{color.label}}</option><option value='custom'>Custom color</option></select><span v-if='particlePalette!==`custom`' class='palette-preview' :style='{background:paletteGradient(particlePalette)}'></span></label>
         <label v-if='particlePalette===`custom`'>Custom particle color <input type='color' v-model='particleColor' @input='applyParticleColor'></label>
         <label>Background <input type='color' v-model='backgroundColor' @input='applyBackground'></label>
         <label>Seed <input type='number' v-model.number='seed' @change='applySpawn'></label>
@@ -210,7 +210,7 @@ import CodeEditor from './CodeEditor.vue';
 import Inputs from './Inputs.vue';
 import MathExpressionInput from './MathExpressionInput.vue';
 import { compileGradientField, compileVectorField, parseParameters, FUNCTION_DATABASE, FUNCTION_HELP } from '../lib/math/expression.js';
-import { PALETTE_OPTIONS, PALETTES, paletteShader } from '../lib/colorPalettes.js';
+import { PALETTE_OPTIONS, paletteGradient, particlePaletteShader } from '../lib/colorPalettes.js';
 import { STUDIO_PRESETS } from '../lib/studioPresets.js';
 import { createAdaptiveQuality } from '../lib/wallpaper/adaptiveQuality.js';
 import { createHistory, deleteProject, listProjects, saveProject } from '../lib/studioProjects.js';
@@ -350,6 +350,7 @@ export default {
     }
   },
   methods: {
+    paletteGradient,
     async applyPreset(preset) {
       this.xExpression=preset.x;this.yExpression=preset.y;await this.applyMathField();
       const cx=preset.center?.[0]||0, cy=preset.center?.[1]||0, half=preset.bounds/2;
@@ -483,12 +484,6 @@ function hex(x) {
   return value;
 }
 function hexColor(value) { const text=String(value||'#000000').replace('#','');return {r:parseInt(text.slice(0,2),16)/255,g:parseInt(text.slice(2,4),16)/255,b:parseInt(text.slice(4,6),16)/255,a:1}; }
-function particlePaletteShader(name,custom){
-  if(name==='rainbow')return `vec4 get_color(vec2 p){vec2 v=get_velocity(p);float h=(atan(v.y,v.x)+PI)/(2.0*PI);return vec4(hsv2rgb(vec3(h,0.82,1.0)),1.0);}`;
-  if(name==='custom'){const {r,g,b}=hexColor(custom);return `vec4 get_color(vec2 p){return vec4(${r.toFixed(4)},${g.toFixed(4)},${b.toFixed(4)},1.0);}`;}
-  if(PALETTES[name]?.type==='solid'){const {r,g,b}=hexColor(PALETTES[name].stops[0]);return `vec4 get_color(vec2 p){return vec4(${r.toFixed(4)},${g.toFixed(4)},${b.toFixed(4)},1.0);}`;}
-  return `vec3 studio_palette(float t){${paletteShader(name)}} vec4 get_color(vec2 p){float s=clamp((length(get_velocity(p))-u_velocity_range.x)/max(0.000001,u_velocity_range.y-u_velocity_range.x),0.0,1.0);return vec4(studio_palette(s),1.0);}`;
-}
 </script>
 
 <style lang='stylus'>
@@ -554,6 +549,7 @@ help-background = rgb(7, 12, 23);
 .studio-simulation-controls { display:grid;gap:9px;margin:16px 0;padding:12px;background:#061121;border:1px solid #21334b; }
 .studio-simulation-controls label { display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:8px;font-size:12px;color:#9ab6d2; }
 .studio-simulation-controls input[type='color'] { width:100%;height:28px;background:transparent;border:1px solid #294563; }
+.palette-preview { width:42px;height:18px;border:1px solid #52708c;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25); }
 .studio-simulation-controls .auto-quality { grid-template-columns:auto 1fr; }
 .command-backdrop{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.58);display:flex;align-items:flex-start;justify-content:center;padding-top:13vh}.command-palette{width:min(520px,88vw);max-height:60vh;overflow:auto;padding:10px;background:#071526;border:1px solid #426887;box-shadow:0 20px 70px #000}.command-palette input{box-sizing:border-box;width:100%;margin:0 0 8px!important;padding:12px!important;font-size:16px!important;background:#020a13!important;border:1px solid #365875!important;color:white!important}.command-palette button{width:100%;display:flex;justify-content:space-between;padding:10px;border:0;border-top:1px solid #152d44;background:transparent;color:#b9dafa;text-align:left;cursor:pointer}.command-palette button:hover{background:#11304b;color:white}.command-palette kbd{color:#6689a8}
 .title.small { font-size: 14px; }

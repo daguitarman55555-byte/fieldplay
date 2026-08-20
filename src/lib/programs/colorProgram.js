@@ -2,6 +2,7 @@ import util from '../gl-utils';
 import bus from '../bus';
 import {decodeFloatRGBA} from '../utils/floatPacking';
 import makeStatCounter from '../utils/makeStatCounter';
+import {robustColorRange} from '../colorRange.js';
 
 const OUT_V_X = 6;
 const OUT_V_Y = 7;
@@ -102,13 +103,16 @@ export default function colorProgram(ctx) {
 
   function updateMinMax() {
     velocityCounter.reset();
+    const speeds=[];
     // TODO: Do I want this to be async?
     for(var i = 0; i < velocity_y.length; i+=4) {
       var vx = readFloat(velocity_x, i);
       var vy = readFloat(velocity_y, i);
       var v = Math.sqrt(vx * vx + vy * vy);
-      if(Number.isFinite(v))velocityCounter.add(v);
+      if(Number.isFinite(v))speeds.push(v);
     }
+    const [lo,hi]=robustColorRange(speeds);
+    velocityCounter.add(lo);velocityCounter.add(hi);
   }
 }
 
