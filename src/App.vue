@@ -12,6 +12,7 @@
     <div v-if='webGLEnabled && !hideUI'>
       <vector-view v-if='vectorLinesEnabled'></vector-view>
       <ruler></ruler>
+      <field-overlay :scene='scene'></field-overlay>
       <studio-status :scene='scene'></studio-status>
       <div class='controls-container' :style='getControlsContainerStyle()' ref='controls'>
         <header class='studio-header'>
@@ -38,6 +39,7 @@ import bus from './lib/bus.js';
 import isSmallScreen from './lib/isSmallScreen.js';
 import VectorView from './components/VectorView.vue';
 import StudioStatus from './components/StudioStatus.vue';
+import FieldOverlay from './components/FieldOverlay.vue';
 import config from './lib/config.js';
 import createDrag from './lib/utils/drag.js';
 import appState from './lib/appState.js';
@@ -83,7 +85,7 @@ export default {
     Share,
     About,
     VectorView
-    ,StudioStatus
+    ,StudioStatus, FieldOverlay
   },
   methods: {
     getControlsContainerStyle() {
@@ -110,6 +112,7 @@ export default {
 
 .controls-container {
   position: absolute;
+  z-index: 10;
   max-height: 100%;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 

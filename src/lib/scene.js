@@ -79,6 +79,13 @@ export default function initScene(gl) {
     screenTextureUnit: 3,
 
     integrationTimeStep: appState.getIntegrationTimeStep(),
+    speedMultiplier: 1,
+    particleSize: 1.5,
+    particleOpacity: 1,
+    integrator: 'rk4',
+    seed: 1337,
+    spawnMode: 'random',
+    random: seededRandom(1337),
 
     // On each frame the likelihood for a particle to reset its position is this:
     dropProbability: appState.getDropProbability(),
@@ -156,6 +163,18 @@ export default function initScene(gl) {
 
     setColorMode,
     getColorMode,
+    setColorFunction(code) { ctx.colorFunction = String(code || ''); appState.setColorFunction(ctx.colorFunction); drawProgram.updateColorMode(); },
+    setIntegrator(method) { ctx.integrator=['euler','midpoint','rk4'].includes(method)?method:'rk4';drawProgram.setIntegrator(ctx.integrator); },
+    getIntegrator: () => ctx.integrator,
+    setSpeedMultiplier(value) { const n=Number(value);if(Number.isFinite(n))ctx.speedMultiplier=Math.max(0,Math.min(10,n)); },
+    getSpeedMultiplier: () => ctx.speedMultiplier,
+    setParticleStyle({size,opacity}={}) { if(Number.isFinite(Number(size)))ctx.particleSize=Math.max(1,Math.min(12,Number(size)));if(Number.isFinite(Number(opacity)))ctx.particleOpacity=Math.max(.05,Math.min(1,Number(opacity))); },
+    getParticleStyle: () => ({size:ctx.particleSize,opacity:ctx.particleOpacity}),
+    setBackgroundColor(value) { screenProgram.setBackgroundColor(value); },
+    setSeed(value) { const seed=Number(value);ctx.seed=Number.isFinite(seed)?Math.trunc(seed):1337;ctx.random=seededRandom(ctx.seed);drawProgram.updateParticlesCount(); },
+    getSeed: () => ctx.seed,
+    setSpawnMode(value) { ctx.spawnMode=['random','grid','ring'].includes(value)?value:'random';ctx.random=seededRandom(ctx.seed);drawProgram.updateParticlesCount(); },
+    getSpawnMode: () => ctx.spawnMode,
 
     vectorFieldEditorState,
 
@@ -473,4 +492,9 @@ export default function initScene(gl) {
     frameListeners.add(listener);
     return () => frameListeners.delete(listener);
   }
+}
+
+export function seededRandom(seed) {
+  let state=(Number(seed)>>>0)||1;
+  return function random(){state=(state+0x6D2B79F5)|0;let t=Math.imul(state^(state>>>15),1|state);t=(t+Math.imul(t^(t>>>7),61|t))^t;return ((t^(t>>>14))>>>0)/4294967296;};
 }

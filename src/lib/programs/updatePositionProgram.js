@@ -15,6 +15,7 @@ export default function updatePositionProgram(ctx) {
   var particleStateResolution;
   var updateProgram;
   var readVelocity = makeReadProgram(ctx);
+  var currentVectorField = '';
 
   // If someone needs to get vectors out from the GPU, they send a `vector-lines-request`
   // over the bus. This request is delayed until next compute frame. Once it is handled,
@@ -29,9 +30,11 @@ export default function updatePositionProgram(ctx) {
     updateParticlesPositions,
     updateParticlesCount,
     prepareToDraw,
+    setIntegrator,
   };
 
   function updateCode(vectorField) {
+    currentVectorField = vectorField;
     particlePositionShaderCodeBuilder.setCustomVectorField(vectorField);
     let fragment = particlePositionShaderCodeBuilder.getFragmentShader();
     let vertex = particlePositionShaderCodeBuilder.getVertexShader();
@@ -42,6 +45,10 @@ export default function updatePositionProgram(ctx) {
     updateProgram = newProgram;
 
     if (ctx.colorMode === ColorMode.VELOCITY) readVelocity.requestSpeedUpdate();
+  }
+  function setIntegrator(method) {
+    particlePositionShaderCodeBuilder.setIntegrator(method);
+    if (currentVectorField) updateCode(currentVectorField);
   }
   
   function updateParticlesCount(x, y) {
@@ -89,6 +96,7 @@ export default function updatePositionProgram(ctx) {
   
     gl.uniform1f(program.u_rand_seed, ctx.frameSeed);
     gl.uniform1f(program.u_h, ctx.integrationTimeStep);
+    gl.uniform1f(program.u_speed, ctx.speedMultiplier);
     gl.uniform1f(program.frame, ctx.frame);
     var cursor = ctx.cursor;
     gl.uniform4f(program.cursor, cursor.clickX, cursor.clickY, cursor.hoverX, cursor.hoverY);

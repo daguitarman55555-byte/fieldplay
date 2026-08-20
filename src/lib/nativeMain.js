@@ -41,6 +41,15 @@ function initVectorFieldApp(canvas) {
     } else {
       initAutoMode(scene);
     }
+    canvas.addEventListener('webglcontextlost', event => {
+      event.preventDefault();
+      scene.stop();
+      document.body.dataset.webglStatus='lost';
+    }, false);
+    canvas.addEventListener('webglcontextrestored', () => {
+      document.body.dataset.webglStatus='restoring';
+      location.reload();
+    }, false);
   } else {
     window.webGLEnabled = false;
   }

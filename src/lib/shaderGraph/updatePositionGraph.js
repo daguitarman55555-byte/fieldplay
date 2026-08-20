@@ -21,6 +21,7 @@ export default class UpdatePositionGraph {
   setCustomVectorField(velocityCode) {
     this.udfVelocity.setNewUpdateCode(velocityCode);
   }
+  setIntegrator(method) { this.integratePositions.setMethod(method); }
 
   getVertexShader () {
     return `precision highp float;

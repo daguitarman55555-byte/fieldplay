@@ -11,8 +11,11 @@ export default class DrawParticleGraph {
   getFragmentShader() {
     return `precision highp float;
 varying vec4 v_particle_color;
+uniform float u_particle_opacity;
 void main() {
-  gl_FragColor = v_particle_color;
+  float d = length(gl_PointCoord - vec2(0.5));
+  if (d > 0.5) discard;
+  gl_FragColor = vec4(v_particle_color.rgb, v_particle_color.a * u_particle_opacity * smoothstep(0.5, 0.18, d));
 }`
   }
 
@@ -31,6 +34,8 @@ attribute float a_index;
 uniform float u_particles_res;
 uniform vec2 u_min;
 uniform vec2 u_max;
+uniform float u_point_size;
+uniform float u_particle_opacity;
 
 ${decodePositions.getVariables() || ''}
 ${colorParts.getVariables()}
@@ -43,7 +48,7 @@ void main() {
   vec2 txPos = vec2(
         fract(a_index / u_particles_res),
         floor(a_index / u_particles_res) / u_particles_res);
-  gl_PointSize = 1.0;
+  gl_PointSize = u_point_size;
 
 ${main.join('\n')}
 

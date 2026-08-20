@@ -23,9 +23,14 @@ export default function makeScreenProgram(ctx) {
     fadeOutLastFrame,
     renderCurrentScreen,
     updateScreenTextures,
+    setBackgroundColor,
 
     boundingBoxUpdated: false
   };
+  function setBackgroundColor(value) {
+    if (!value) return;
+    backgroundColor = {r:clamp(value.r),g:clamp(value.g),b:clamp(value.b),a:value.a === undefined ? 1 : clamp(value.a)};
+  }
 
   return api;
   
@@ -117,6 +122,7 @@ export default function makeScreenProgram(ctx) {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 }
+function clamp(value){return Math.max(0,Math.min(1,Number(value)||0));}
 
 function getScreenVertexShader() {
   return `// screen program

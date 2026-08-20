@@ -2,10 +2,23 @@
   <div class='settings' :class='{collapsed: settingsPanel.collapsed}'>
     <div class='block vector-field' v-if='vectorField'>
       <div class='title'>Vector field <a class='reset-all' :class='{"syntax-visible": syntaxHelpVisible}' href='#' @click.prevent='syntaxHelpVisible = !syntaxHelpVisible'>Syntax</a></div>
+      <div class='math-editor'>
+        <label><span>dx/dt</span><input v-model='xExpression' @keyup.enter='applyMathField'></label>
+        <label><span>dy/dt</span><input v-model='yExpression' @keyup.enter='applyMathField'></label>
+        <label><span>Parameters</span><input v-model='parameterText' placeholder='a=1, b=0.25' @keyup.enter='applyMathField'></label>
+        <div class='parameter-control' v-for='(value, name) in parameterValues' :key='name'>
+          <span>{{name}}</span><input type='range' min='-10' max='10' step='.01' :value='value' @input='updateParameter(name, $event.target.value)'><output>{{Number(value).toFixed(2)}}</output>
+        </div>
+        <button @click='applyMathField'>Apply equations</button>
+        <p class='math-error' v-if='mathError'>{{mathError}}</p>
+      </div>
       <syntax v-if='syntaxHelpVisible' @close='syntaxHelpVisible = false'></syntax>
+      <details class='advanced-code'><summary>Advanced GLSL editor</summary>
       <code-editor :model='vectorField'></code-editor>
+      </details>
+      <input class='preset-search' v-model='presetSearch' placeholder='Search field presets'>
       <div class='preset-grid'>
-        <button v-for='preset in presets' :key='preset.name' @click='applyPreset(preset)'>{{preset.name}}</button>
+        <button v-for='preset in filteredPresets' :key='preset.name' @click='applyPreset(preset)'>{{preset.name}}</button>
       </div>
       <div class='gradient-builder'>
         <div class='title small'>Gradient field</div>
@@ -26,6 +39,7 @@
               <option value='1'>Uniform</option>
               <option value='2'>Velocity</option>
               <option value='3'>Angle</option>
+	            <option value='4'>Custom</option>
 	        </select>
         </div>
         <help-icon @show='selectedColorHelp = !selectedColorHelp' :class='{open: selectedColorHelp}'></help-icon>
@@ -47,6 +61,13 @@
           <input type='text' v-model='soundCloudLink'>
           <a href='#' @click.prevent='loadSound'>load</a>
         </div>
+      </div>
+      <div class='overlay-controls'>
+        <div class='title small'>Visualization layers</div>
+        <label v-for='item in overlayToggles' :key='item.key'><input type='checkbox' v-model='overlay[item.key]' @change='publishOverlay'> {{item.label}}</label>
+        <label class='range-label'>Arrow density <input type='range' min='8' max='42' v-model.number='overlay.arrowDensity' @input='publishOverlay'></label>
+        <label class='range-label'>Overlay opacity <input type='range' min='.15' max='1' step='.05' v-model.number='overlay.opacity' @input='publishOverlay'></label>
+        <label>Overlay palette <select v-model='overlay.palette' @change='publishOverlay'><option value='cyan'>Cyan</option><option value='violet'>Violet</option><option value='gold'>Gold</option><option value='white'>White</option></select></label>
       </div>
       <div class='row' v-if='soundAvailable'>
         <audio ref='player' controls='' autoplay='' preload autobuffer></audio>
@@ -107,6 +128,18 @@
           <p>Default value is <b>0.01</b></p>
         </div>
       </div>
+      <div class='studio-simulation-controls'>
+        <div class='title small'>Numerical engine and style</div>
+        <label>Integrator <select v-model='integrator' @change='applySimulation'><option value='euler'>Euler</option><option value='midpoint'>Midpoint (RK2)</option><option value='rk4'>Runge–Kutta 4</option></select></label>
+        <label>Speed <input type='range' min='0' max='4' step='.05' v-model.number='speedMultiplier' @input='applySimulation'><output>{{speedMultiplier.toFixed(2)}}×</output></label>
+        <label>Particle size <input type='range' min='1' max='8' step='.25' v-model.number='particleSize' @input='applyParticleStyle'><output>{{particleSize}} px</output></label>
+        <label>Particle opacity <input type='range' min='.05' max='1' step='.05' v-model.number='particleOpacity' @input='applyParticleStyle'><output>{{particleOpacity}}</output></label>
+        <label>Particle color <input type='color' v-model='particleColor' @input='applyParticleColor'></label>
+        <label>Background <input type='color' v-model='backgroundColor' @input='applyBackground'></label>
+        <label>Seed <input type='number' v-model.number='seed' @change='applySpawn'></label>
+        <label>Spawn <select v-model='spawnMode' @change='applySpawn'><option value='random'>Random</option><option value='grid'>Grid</option><option value='ring'>Ring</option></select></label>
+        <label class='auto-quality'><input type='checkbox' v-model='adaptiveEnabled' @change='toggleAdaptive'> Adaptive performance</label>
+      </div>
       <div class='bounding-box'>
         <div class='col title'>bounds</div>
         <div class='row'>
@@ -122,6 +155,14 @@
         </div>
       </div>
     </form>
+    <section class='project-panel'>
+      <div class='title'>Projects and history</div>
+      <div class='history-buttons'><button @click='undo'>Undo</button><button @click='redo'>Redo</button><button @click='downloadPNG'>Export PNG</button></div>
+      <div class='save-project'><input v-model='projectName' placeholder='Project name'><button @click='saveCurrentProject'>Save</button></div>
+      <div class='saved-project' v-for='project in savedProjects' :key='project.name'><span>{{project.name}}</span><button @click='loadProject(project)'>Load</button><button @click='compareProject(project)'>Compare</button><button @click='removeProject(project.name)'>×</button></div>
+      <label class='import-project'>Import project JSON<input type='file' accept='.json,application/json' @change='importProject'></label>
+      <button v-if='comparisonActive' @click='clearComparison'>Clear comparison</button>
+    </section>
     <section class='export-panel'>
       <div class='title'>Share and embed</div>
       <p>The current field and viewport already live in the URL. Copy it to share an exact scene.</p>
@@ -143,8 +184,10 @@ import Syntax from './help/Syntax.vue';
 import HelpIcon from './help/Icon.vue';
 import CodeEditor from './CodeEditor.vue';
 import Inputs from './Inputs.vue';
-import { createGradientFieldCode } from '../lib/integration/fieldplayBridge.js';
+import { compileGradientField, compileVectorField, parseParameters } from '../lib/math/expression.js';
 import { STUDIO_PRESETS } from '../lib/studioPresets.js';
+import { createAdaptiveQuality } from '../lib/wallpaper/adaptiveQuality.js';
+import { createHistory, deleteProject, listProjects, saveProject } from '../lib/studioProjects.js';
 
 // Temporary disable this until API is finished.
 const soundAvailable = config.isAudioEnabled;
@@ -168,16 +211,29 @@ export default {
     if (this.scene) this.onSceneReady(this.scene);
 
     if (soundAvailable) this.soundLoader = new SoundLoader(this.$refs.player);
+    this.onHistoryKey=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?this.redo():this.undo();}};document.addEventListener('keydown',this.onHistoryKey);
   },
   beforeUnmount() {
     bus.off('scene-ready', this.onSceneReady, this);
     bus.off('bbox-change', this.updateBBox, this);
+    if (this.adaptiveController) this.adaptiveController.dispose();
+    document.removeEventListener('keydown',this.onHistoryKey);
   },
   data() {
     return {
       presets: STUDIO_PRESETS,
+      presetSearch: '',
       copyLabel: 'Copy share link',
       scalarExpression: 'sin(x) * cos(y)',
+      xExpression: '0.1*y',
+      yExpression: '-0.2*y',
+      parameterText: '',
+      parameterValues: {},
+      mathError: '',
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.72,palette:'cyan'},
+      overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Scalar contours'},{key:'critical',label:'Critical points'}],
+      integrator:'rk4',speedMultiplier:1,particleSize:1.5,particleOpacity:1,particleColor:'#4ec4ff',backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,
+      history:createHistory(),projectName:'My field',savedProjects:listProjects(),comparisonActive:false,restoring:false,
       soundCloudLink: 'https://soundcloud.com/mrfijiwiji/yours-truly',
       vectorField: null,
       settingsPanel: appState.settingsPanel,
@@ -225,6 +281,10 @@ export default {
     maxY(newValue) { this.moveBoundingBox('maxY', newValue) },
   },
   computed: {
+    filteredPresets() {
+      const query=this.presetSearch.trim().toLowerCase();
+      return query ? this.presets.filter(p=>`${p.name} ${p.x} ${p.y}`.toLowerCase().includes(query)) : this.presets;
+    },
     particleCountDelta() {
       return exponentialStep(this.particlesCount);
     },
@@ -248,21 +308,43 @@ export default {
   },
   methods: {
     async applyPreset(preset) {
-      await this.vectorField.setCode(preset.code);
+      this.xExpression=preset.x;this.yExpression=preset.y;await this.applyMathField();
       const cx=preset.center?.[0]||0, cy=preset.center?.[1]||0, half=preset.bounds/2;
       this.scene.applyBoundingBox({minX:cx-half,maxX:cx+half,minY:cy-half,maxY:cy+half});
     },
+    async applyMathField() {
+      try { const parameters=parseParameters(this.parameterText);this.parameterValues={...parameters};const model=compileVectorField(this.xExpression,this.yExpression,parameters);const result=await this.vectorField.setCode(model.code);if(result?.error)throw new Error(result.error.error||result.error.message||'Shader compilation failed');this.mathError='';this.currentModel=model;bus.fire('studio-field-model',model);if(!this.restoring)this.history.push(this.projectSnapshot());this.persistStudioState();return model; } catch(error){this.mathError=error.message||String(error);return null;}
+    },
+    updateParameter(name,value){this.parameterValues[name]=Number(value);this.parameterText=Object.entries(this.parameterValues).map(([key,val])=>`${key}=${val}`).join(', ');this.applyMathField();},
+    publishOverlay(){bus.fire('studio-overlay-options',{...this.overlay});},
+    applySimulation(){this.scene.setIntegrator(this.integrator);this.scene.setSpeedMultiplier(this.speedMultiplier);},
+    applySpawn(){this.scene.setSeed(this.seed);this.scene.setSpawnMode(this.spawnMode);this.persistStudioState();},
+    applyParticleStyle(){this.scene.setParticleStyle({size:this.particleSize,opacity:this.particleOpacity});},
+    applyParticleColor(){const {r,g,b}=hexColor(this.particleColor);this.scene.setColorFunction(`vec4 get_color(vec2 p) { return vec4(${r.toFixed(4)}, ${g.toFixed(4)}, ${b.toFixed(4)}, 1.0); }`);this.selectedColorMode=4;this.scene.setColorMode(4);},
+    applyBackground(){this.scene.setBackgroundColor(hexColor(this.backgroundColor));},
+    toggleAdaptive(){if(this.adaptiveController){this.adaptiveController.dispose();this.adaptiveController=null;}if(this.adaptiveEnabled)this.adaptiveController=createAdaptiveQuality({scene:this.scene,quality:'auto',maxParticles:100000});},
+    projectSnapshot(){return{name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,seed:this.seed,spawnMode:this.spawnMode},appearance:{particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
+    async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};this.applyParticleStyle();this.applyParticleColor();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
+    persistStudioState(){if(this.scene&&!this.restoring)try{localStorage.setItem('fieldplay-studio-current',JSON.stringify(this.projectSnapshot()));}catch(error){}},
+    undo(){this.restoreSnapshot(this.history.undo());},redo(){this.restoreSnapshot(this.history.redo());},
+    saveCurrentProject(){this.savedProjects=saveProject(this.projectSnapshot());},
+    loadProject(project){this.projectName=project.name;this.restoreSnapshot(project);this.history.push(project);},
+    removeProject(name){this.savedProjects=deleteProject(name);},
+    compareProject(project){try{const model=compileVectorField(project.xExpression,project.yExpression,parseParameters(project.parameterText));bus.fire('studio-compare-model',model);this.comparisonActive=true;}catch(error){this.mathError=error.message;}},
+    clearComparison(){bus.fire('studio-compare-model',null);this.comparisonActive=false;},
+    async importProject(event){const file=event.target.files?.[0];if(!file)return;try{const project=JSON.parse(await file.text());if(!project.xExpression||!project.yExpression)throw new Error('Not a FieldPlay Studio project');this.projectName=project.name||file.name.replace(/\.json$/,'');await this.restoreSnapshot(project);this.savedProjects=saveProject(this.projectSnapshot());}catch(error){this.mathError=error.message;}event.target.value='';},
+    downloadPNG(){const canvases=[...document.querySelectorAll('canvas')];const out=document.createElement('canvas');out.width=innerWidth*(devicePixelRatio||1);out.height=innerHeight*(devicePixelRatio||1);const ctx=out.getContext('2d');ctx.scale(devicePixelRatio||1,devicePixelRatio||1);canvases.forEach(canvas=>ctx.drawImage(canvas,parseFloat(canvas.style.left)||0,parseFloat(canvas.style.top)||0,innerWidth,innerHeight));const link=document.createElement('a');link.download='fieldplay.png';link.href=out.toDataURL('image/png');link.click();},
     async copyShareLink() {
       await navigator.clipboard.writeText(location.href);
       this.copyLabel='Copied'; setTimeout(()=>this.copyLabel='Copy share link',1200);
     },
     downloadState() {
-      const blob=new Blob([JSON.stringify(window.FieldPlay.getState(),null,2)],{type:'application/json'});
+      const blob=new Blob([JSON.stringify(this.projectSnapshot(),null,2)],{type:'application/json'});
       const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='fieldplay-state.json'; link.click();
       setTimeout(()=>URL.revokeObjectURL(link.href),0);
     },
     applyGradient() {
-      this.vectorField.setCode(createGradientFieldCode(this.scalarExpression));
+      try {const model=compileGradientField(this.scalarExpression,parseParameters(this.parameterText));this.vectorField.setCode(model.code).then(result=>{if(result?.error)throw new Error('Shader compilation failed');this.mathError='';bus.fire('studio-field-model',model);});}catch(error){this.mathError=error.message||String(error);}
     },
     moveBoundingBox(key, value) {
       if (this.ignoreBbox) {
@@ -303,7 +385,9 @@ export default {
       this.dropProbability = scene.getDropProbability();
       this.timeStep = scene.getIntegrationTimeStep();
       this.selectedColorMode = scene.getColorMode();
+      this.integrator=scene.getIntegrator();this.speedMultiplier=scene.getSpeedMultiplier();const style=scene.getParticleStyle();this.particleSize=style.size;this.particleOpacity=style.opacity;
       this.updateBBox();
+      this.$nextTick(async()=>{let saved=null;try{saved=JSON.parse(localStorage.getItem('fieldplay-studio-current'));}catch(error){}if(saved)await this.restoreSnapshot(saved);else await this.applyMathField();this.publishOverlay();});
     },
 
     updateBBox() {
@@ -346,6 +430,7 @@ function hex(x) {
   if (value.length === 1) value = '0' + value;
   return value;
 }
+function hexColor(value) { const text=String(value||'#000000').replace('#','');return {r:parseInt(text.slice(0,2),16)/255,g:parseInt(text.slice(2,4),16)/255,b:parseInt(text.slice(4,6),16)/255,a:1}; }
 </script>
 
 <style lang='stylus'>
@@ -370,6 +455,13 @@ help-background = rgb(7, 12, 23);
 .export-panel p { font-size:13px; line-height:1.5; }
 .export-panel>button { width:100%; margin:0 0 8px; }
 .bridge-note { margin-top:14px; padding:12px; border-left:2px solid #42aaf5; background:#061121; font-size:12px; line-height:1.6; }
+.project-panel { margin:14px 0;color:#9ab6d2; }
+.project-panel button,.project-panel input { padding:7px;border:1px solid #294563;background:#071526;color:#dcecff; }
+.history-buttons { display:grid;grid-template-columns:repeat(3,1fr);gap:6px; }
+.save-project { display:grid;grid-template-columns:1fr auto;gap:6px;margin:8px 0; }
+.saved-project { display:grid;grid-template-columns:1fr auto auto 28px;gap:4px;align-items:center;margin-top:4px;font-size:12px; }
+.import-project { display:block;border:1px dashed #294563;padding:9px;margin-top:8px;text-align:center;cursor:pointer;font-size:12px; }
+.import-project input { display:none; }
 .gradient-builder {
   border-top: 1px solid #21334b;
   margin-top: 14px;
@@ -378,6 +470,23 @@ help-background = rgb(7, 12, 23);
   input { margin: 0 !important; border: 1px solid #2c4562 !important; background: #061121 !important; }
   button { width: 100%; margin-top: 8px; padding: 9px; border: 1px solid #297ec1; color: white; background: #12558d; cursor: pointer; }
 }
+.math-editor { display:grid; gap:7px; margin-bottom:10px; }
+.math-editor label { display:grid; grid-template-columns:76px 1fr; align-items:center; font:12px ui-monospace,monospace; color:#9ab6d2; }
+.math-editor input { margin:0 !important; border:1px solid #2c4562 !important; background:#061121 !important; }
+.parameter-control { display:grid;grid-template-columns:76px 1fr 44px;align-items:center;gap:6px;color:#9ab6d2;font:11px ui-monospace,monospace; }
+.preset-search { box-sizing:border-box;margin:10px 0 0 !important;border:1px solid #2c4562 !important;background:#061121 !important; }
+.math-editor button { padding:9px;border:1px solid #297ec1;color:white;background:#12558d;cursor:pointer; }
+.math-error { color:#ff8f9b;font:12px/1.4 ui-monospace,monospace;margin:3px 0; }
+.advanced-code { border-top:1px solid #21334b;padding-top:8px; }
+.advanced-code summary { cursor:pointer;color:#7893ad;font-size:12px; }
+.overlay-controls { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0;padding:12px;background:#061121;border:1px solid #21334b; }
+.overlay-controls .title { grid-column:1/-1; }
+.overlay-controls label { font-size:12px;color:#9ab6d2; }
+.overlay-controls .range-label { grid-column:1/-1;display:grid;grid-template-columns:110px 1fr;align-items:center; }
+.studio-simulation-controls { display:grid;gap:9px;margin:16px 0;padding:12px;background:#061121;border:1px solid #21334b; }
+.studio-simulation-controls label { display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:8px;font-size:12px;color:#9ab6d2; }
+.studio-simulation-controls input[type='color'] { width:100%;height:28px;background:transparent;border:1px solid #294563; }
+.studio-simulation-controls .auto-quality { grid-template-columns:auto 1fr; }
 .title.small { font-size: 14px; }
 .settings.collapsed {
   display: none;
