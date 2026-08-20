@@ -1,9 +1,6 @@
 <template>
   <div class='settings' :class='{collapsed: settingsPanel.collapsed}'>
-    <nav class='studio-tabs'>
-      <button v-for='tab in tabs' :key='tab' :class='{active: activeTab === tab}' @click='activeTab = tab'>{{tab}}</button>
-    </nav>
-    <div class='block vector-field' v-if='vectorField && activeTab === "Field"'>
+    <div class='block vector-field' v-if='vectorField'>
       <div class='title'>Vector field <a class='reset-all' :class='{"syntax-visible": syntaxHelpVisible}' href='#' @click.prevent='syntaxHelpVisible = !syntaxHelpVisible'>Syntax</a></div>
       <syntax v-if='syntaxHelpVisible' @close='syntaxHelpVisible = false'></syntax>
       <code-editor :model='vectorField'></code-editor>
@@ -20,9 +17,9 @@
     <div class='block' v-if='showBindings'>
       <Inputs :vm='inputsModel'></Inputs>
     </div>
-    <form class='block' v-show='activeTab === "Simulation" || activeTab === "Appearance"' @submit.prevent='onSubmit'>
+    <form class='block' @submit.prevent='onSubmit'>
       <div class='title'>Settings<a class='reset-all' href='?' title='set default settings'>reset all</a> </div>
-      <div class='row' v-show='activeTab === "Appearance"'>
+      <div class='row'>
         <div class='col'>Particle color</div>
         <div class='col'> 
           <select v-model='selectedColorMode' @change='changeColor'>
@@ -33,7 +30,7 @@
         </div>
         <help-icon @show='selectedColorHelp = !selectedColorHelp' :class='{open: selectedColorHelp}'></help-icon>
       </div>
-      <div class='row help' v-if='selectedColorHelp && activeTab === "Appearance"'>
+      <div class='row help' v-if='selectedColorHelp'>
         <div>
           <p>Defines background color for a vector field zone. Each particle entering into this zone wll be colored accordingly</p>
           <ul>
@@ -44,33 +41,33 @@
           <p>Default value is "Uniform"</p>
         </div>
       </div>
-      <div class='row' v-if='soundAvailable && activeTab === "Appearance"'>
+      <div class='row' v-if='soundAvailable'>
         <div class='col'>SoundCloud track</div>
         <div class='col'>
           <input type='text' v-model='soundCloudLink'>
           <a href='#' @click.prevent='loadSound'>load</a>
         </div>
       </div>
-      <div class='row' v-if='soundAvailable && activeTab === "Appearance"'>
+      <div class='row' v-if='soundAvailable'>
         <audio ref='player' controls='' autoplay='' preload autobuffer></audio>
       </div>
-      <div class='row' v-show='activeTab === "Simulation"'>
+      <div class='row'>
         <div class='col'>Particles count </div>
         <div class='col'><input type='number' :step='particleCountDelta' v-model='particlesCount' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
         <help-icon @show='particleCountHelpVisible = !particleCountHelpVisible' :class='{open: particleCountHelpVisible}'></help-icon>
       </div>
-      <div class='row help' v-if='particleCountHelpVisible && activeTab === "Simulation"'>
+      <div class='row help' v-if='particleCountHelpVisible'>
         <div>
           <p>How many particles should be visible inside bounding box? Higher values produce denser plots, smaller values are faster to compute.</p>
           <p>Recommended value is between <b>10,000</b> and <b>100,000</b></p>
         </div>
       </div>
-      <div class='row' v-show='activeTab === "Simulation"'>
+      <div class='row'>
         <div class='col'>Fade out speed</div>
         <div class='col'><input type='number' :step='fadeoutDelta'  v-model='fadeOutSpeed' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
         <help-icon @show='fadeoutDeltaHelp = !fadeoutDeltaHelp' :class='{open: fadeoutDeltaHelp}'></help-icon>
       </div>
-      <div class='row help' v-if='fadeoutDeltaHelp && activeTab === "Simulation"'>
+      <div class='row help' v-if='fadeoutDeltaHelp'>
         <div>
           <p>Before a particle is moved to the next position, we multiply its transparency by this number. This gives a fading out trace behind the particle</p>
           <ul>
@@ -80,12 +77,12 @@
           <p>Recommended value is <b>0.998</b></p>
         </div>
       </div>
-      <div class='row' v-show='activeTab === "Simulation"'>
+      <div class='row'>
         <div class='col'>Particle reset probability</div>
         <div class='col'><input type='number' :step='resetProbabilityDelta'  v-model='dropProbability' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
         <help-icon @show='resetProbabilityHelp = !resetProbabilityHelp' :class='{open: resetProbabilityHelp}'></help-icon>
       </div>
-      <div class='row help' v-if='resetProbabilityHelp && activeTab === "Simulation"'>
+      <div class='row help' v-if='resetProbabilityHelp'>
         <div>
           <p>This is a probability that a particle will reset its position to a random location inside bounding box. This prevents particles from flying out of the screen.</p>
           <ul>
@@ -95,12 +92,12 @@
           <p>Default value is <b>0.009</b></p>
         </div>
       </div>
-      <div class='row' v-show='activeTab === "Simulation"'>
+      <div class='row'>
         <div class='col'>Integration timestep</div>
         <div class='col'><input type='number' :step='integrationStepDelta' v-model='timeStep' @keyup.enter='onSubmit' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ></div>
         <help-icon @show='integrationStepHelp = !integrationStepHelp' :class='{open: integrationStepHelp}'></help-icon>
       </div>
-      <div class='row help' v-if='integrationStepHelp && activeTab === "Simulation"'>
+      <div class='row help' v-if='integrationStepHelp'>
         <div>
           <p>This parameter defines how fast time flies for each particle (or, to be more accurate, this is the integration step of the classical Runge-Kutta method)</p>
           <ul>
@@ -110,7 +107,7 @@
           <p>Default value is <b>0.01</b></p>
         </div>
       </div>
-      <div class='bounding-box' v-show='activeTab === "Simulation"'>
+      <div class='bounding-box'>
         <div class='col title'>bounds</div>
         <div class='row'>
           <div class='col  center'><input type='number' v-model.lazy='minY' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
@@ -125,7 +122,7 @@
         </div>
       </div>
     </form>
-    <section class='export-panel' v-show='activeTab === "Export"'>
+    <section class='export-panel'>
       <div class='title'>Share and embed</div>
       <p>The current field and viewport already live in the URL. Copy it to share an exact scene.</p>
       <button @click='copyShareLink'>{{copyLabel}}</button>
@@ -178,8 +175,6 @@ export default {
   },
   data() {
     return {
-      tabs: ['Field', 'Appearance', 'Simulation', 'Export'],
-      activeTab: 'Field',
       presets: STUDIO_PRESETS,
       copyLabel: 'Copy share link',
       scalarExpression: 'sin(x) * cos(y)',
@@ -367,14 +362,6 @@ help-background = rgb(7, 12, 23);
   background: rgba(3, 10, 23, .96);
   width: 100%;
   padding: 7px 7px 7px 7px;
-}
-.studio-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-bottom: 1px solid #21334b;
-  margin: -7px -7px 16px;
-  button { padding: 12px 4px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #7893ad; cursor: pointer; }
-  button.active { color: #62c3ff; border-bottom-color: #42aaf5; }
 }
 .preset-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:12px; }
 .preset-grid button, .export-panel button { padding:8px 5px; border:1px solid #294563; background:#071526; color:#9ec8ed; cursor:pointer; }
