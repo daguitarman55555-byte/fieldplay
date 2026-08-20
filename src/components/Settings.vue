@@ -3,8 +3,8 @@
     <div class='block vector-field' v-if='vectorField'>
       <div class='title'>Vector field <a class='reset-all' :class='{"syntax-visible": syntaxHelpVisible}' href='#' @click.prevent='syntaxHelpVisible = !syntaxHelpVisible'>Syntax</a></div>
       <div class='math-editor'>
-        <label><span>dx/dt</span><input v-model='xExpression' @keyup.enter='applyMathField'></label>
-        <label><span>dy/dt</span><input v-model='yExpression' @keyup.enter='applyMathField'></label>
+        <label><span>dx/dt</span><math-expression-input v-model='xExpression' label='x velocity equation' @enter='applyMathField'/></label>
+        <label><span>dy/dt</span><math-expression-input v-model='yExpression' label='y velocity equation' @enter='applyMathField'/></label>
         <label><span>Parameters</span><input v-model='parameterText' placeholder='a=1, b=0.25' @keyup.enter='applyMathField'></label>
         <div class='parameter-control' v-for='(value, name) in parameterValues' :key='name'>
           <span>{{name}}</span><input type='range' min='-10' max='10' step='.01' :value='value' @input='updateParameter(name, $event.target.value)'><output>{{Number(value).toFixed(2)}}</output>
@@ -13,7 +13,7 @@
         <p class='math-error' v-if='mathError'>{{mathError}}</p>
       </div>
       <syntax v-if='syntaxHelpVisible' @close='syntaxHelpVisible = false'></syntax>
-      <details class='advanced-code'><summary>Advanced GLSL editor</summary>
+      <details class='advanced-code'><summary>Developer mode — advanced GLSL</summary>
       <code-editor :model='vectorField'></code-editor>
       </details>
       <input class='preset-search' v-model='presetSearch' placeholder='Search field presets'>
@@ -22,8 +22,8 @@
       </div>
       <div class='gradient-builder'>
         <div class='title small'>Gradient field</div>
-        <p>Enter a scalar GLSL expression to visualize ∇f.</p>
-        <input type='text' v-model='scalarExpression' placeholder='sin(x) * cos(y)'>
+        <p>Type an ordinary scalar equation to visualize its gradient ∇f.</p>
+        <math-expression-input v-model='scalarExpression' label='scalar potential equation' @enter='applyGradient'/>
         <button type='button' @click='applyGradient'>Apply ∇f</button>
       </div>
     </div>
@@ -67,7 +67,7 @@
         <label v-for='item in overlayToggles' :key='item.key'><input type='checkbox' v-model='overlay[item.key]' @change='publishOverlay'> {{item.label}}</label>
         <label class='range-label'>Arrow density <input type='range' min='8' max='42' v-model.number='overlay.arrowDensity' @input='publishOverlay'></label>
         <label class='range-label'>Overlay opacity <input type='range' min='.15' max='1' step='.05' v-model.number='overlay.opacity' @input='publishOverlay'></label>
-        <label>Overlay palette <select v-model='overlay.palette' @change='publishOverlay'><option value='cyan'>Cyan</option><option value='violet'>Violet</option><option value='gold'>Gold</option><option value='white'>White</option></select></label>
+        <label>Arrow colors <select v-model='overlay.palette' @change='publishOverlay'><option value='magnitude'>Magnitude</option><option value='cyan'>Cyan</option><option value='violet'>Violet</option><option value='gold'>Gold</option><option value='white'>White</option></select></label>
       </div>
       <div class='row' v-if='soundAvailable'>
         <audio ref='player' controls='' autoplay='' preload autobuffer></audio>
@@ -184,6 +184,7 @@ import Syntax from './help/Syntax.vue';
 import HelpIcon from './help/Icon.vue';
 import CodeEditor from './CodeEditor.vue';
 import Inputs from './Inputs.vue';
+import MathExpressionInput from './MathExpressionInput.vue';
 import { compileGradientField, compileVectorField, parseParameters } from '../lib/math/expression.js';
 import { STUDIO_PRESETS } from '../lib/studioPresets.js';
 import { createAdaptiveQuality } from '../lib/wallpaper/adaptiveQuality.js';
@@ -199,7 +200,8 @@ export default {
     Syntax,
     HelpIcon,
     CodeEditor,
-    Inputs
+    Inputs,
+    MathExpressionInput
   },
   mounted() {
     bus.on('scene-ready', this.onSceneReady, this);
@@ -233,8 +235,8 @@ export default {
       parameterText: '',
       parameterValues: {},
       mathError: '',
-      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.72,palette:'cyan'},
-      overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Scalar contours'},{key:'critical',label:'Critical points'}],
+      overlay:{grid:true,axes:true,arrows:true,heatmap:false,contours:false,critical:true,arrowDensity:22,opacity:.82,palette:'magnitude'},
+      overlayToggles:[{key:'grid',label:'Grid'},{key:'axes',label:'Axes'},{key:'arrows',label:'Vector arrows'},{key:'heatmap',label:'Magnitude heatmap'},{key:'contours',label:'Scalar contours (∇f)'},{key:'critical',label:'Critical points'}],
       integrator:'rk4',speedMultiplier:1,particleSize:1.5,particleOpacity:1,particleColor:'#4ec4ff',backgroundColor:'#13294f',seed:1337,spawnMode:'random',adaptiveEnabled:false,
       history:createHistory(),projectName:'My field',savedProjects:listProjects(),comparisonActive:false,restoring:false,
       soundCloudLink: 'https://soundcloud.com/mrfijiwiji/yours-truly',
@@ -333,8 +335,8 @@ export default {
     applyParticleColor(){const {r,g,b}=hexColor(this.particleColor);this.selectedColorMode=4;this.scene.setColorFunction(`vec4 get_color(vec2 p) { return vec4(${r.toFixed(4)}, ${g.toFixed(4)}, ${b.toFixed(4)}, 1.0); }`);this.queuePersist();},
     applyBackground(){this.scene.setBackgroundColor(hexColor(this.backgroundColor));this.queuePersist();},
     toggleAdaptive(){if(this.adaptiveController){this.adaptiveController.dispose();this.adaptiveController=null;}if(this.adaptiveEnabled)this.adaptiveController=createAdaptiveQuality({scene:this.scene,quality:'auto',maxParticles:100000,onChange:count=>{this.particlesCount=count;}});},
-    projectSnapshot(){return{name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,seed:this.seed,spawnMode:this.spawnMode},appearance:{particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
-    async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};this.applyParticleStyle();this.applyParticleColor();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
+    projectSnapshot(){return{version:2,name:this.projectName,xExpression:this.xExpression,yExpression:this.yExpression,parameterText:this.parameterText,scalarExpression:this.scalarExpression,viewport:{...this.scene.getBoundingBox()},simulation:{particles:this.particlesCount,timeStep:this.timeStep,fade:this.fadeOutSpeed,drop:this.dropProbability,integrator:this.integrator,speed:this.speedMultiplier,seed:this.seed,spawnMode:this.spawnMode},appearance:{particleColor:this.particleColor,backgroundColor:this.backgroundColor,particleSize:this.particleSize,particleOpacity:this.particleOpacity,overlay:{...this.overlay}}};},
+    async restoreSnapshot(snapshot){if(!snapshot)return;this.restoring=true;try{this.xExpression=snapshot.xExpression;this.yExpression=snapshot.yExpression;this.parameterText=snapshot.parameterText||'';this.scalarExpression=snapshot.scalarExpression||this.scalarExpression;if(snapshot.viewport)this.scene.applyBoundingBox(snapshot.viewport);if(snapshot.simulation){Object.assign(this,{particlesCount:snapshot.simulation.particles,timeStep:snapshot.simulation.timeStep,fadeOutSpeed:snapshot.simulation.fade,dropProbability:snapshot.simulation.drop,integrator:snapshot.simulation.integrator||'rk4',speedMultiplier:snapshot.simulation.speed??1,seed:snapshot.simulation.seed??1337,spawnMode:snapshot.simulation.spawnMode||'random'});this.applySimulation();this.applySpawn();}if(snapshot.appearance){Object.assign(this,snapshot.appearance);if(snapshot.appearance.overlay)this.overlay={...this.overlay,...snapshot.appearance.overlay};if(!snapshot.version&&this.overlay.palette==='cyan')this.overlay.palette='magnitude';this.applyParticleStyle();this.applyParticleColor();this.applyBackground();this.publishOverlay();}await this.applyMathField();}finally{this.restoring=false;}},
     persistStudioState(){if(this.scene&&!this.restoring)try{const snapshot=this.projectSnapshot();snapshot.code=this.currentModel?.code;localStorage.setItem('fieldplay-studio-current',JSON.stringify(snapshot));const url=new URL(location.href);url.searchParams.set('sx',this.xExpression);url.searchParams.set('sy',this.yExpression);if(this.parameterText)url.searchParams.set('sp',this.parameterText);else url.searchParams.delete('sp');history.replaceState(null,'',url);}catch(error){}},
     queuePersist(){if(this.restoring||!this.scene)return;clearTimeout(this.persistTimer);this.persistTimer=setTimeout(()=>this.persistStudioState(),180);},
     undo(){this.restoreSnapshot(this.history.undo());},redo(){this.restoreSnapshot(this.history.redo());},
@@ -480,7 +482,6 @@ help-background = rgb(7, 12, 23);
   margin-top: 14px;
   padding-top: 14px;
   p { font-size: 12px; line-height: 1.4; color: #7893ad; }
-  input { margin: 0 !important; border: 1px solid #2c4562 !important; background: #061121 !important; }
   button { width: 100%; margin-top: 8px; padding: 9px; border: 1px solid #297ec1; color: white; background: #12558d; cursor: pointer; }
 }
 .math-editor { display:grid; gap:7px; margin-bottom:10px; }

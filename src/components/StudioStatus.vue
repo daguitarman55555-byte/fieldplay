@@ -10,12 +10,12 @@
 export default {
   props: ['scene'],
   data: () => ({ fps: 0, particles: 0, bounds: {minX:0,maxX:0,minY:0,maxY:0}, frames: 0, started: performance.now() }),
-  mounted() { this.unsubscribe=this.scene.onFrame(()=>this.sample()); this.sample(); },
+  watch:{scene:{immediate:true,handler(scene){if(this.unsubscribe)this.unsubscribe();this.unsubscribe=null;if(scene){this.started=performance.now();this.frames=0;this.unsubscribe=scene.onFrame(()=>this.sample());this.sample(true);}}}},
   beforeUnmount() { if(this.unsubscribe)this.unsubscribe(); },
   methods: {
-    sample() {
+    sample(force=false) {
       this.frames += 1; const now=performance.now(); const elapsed=now-this.started;
-      if(elapsed<500)return; this.fps=Math.round(this.frames*1000/elapsed); this.frames=0; this.started=now;
+      if(!force&&elapsed<500)return; if(!force)this.fps=Math.round(this.frames*1000/elapsed); this.frames=0; this.started=now;
       this.particles=this.scene.getParticlesCount(); const b=this.scene.getBoundingBox();
       this.bounds=Object.fromEntries(Object.entries(b).map(([k,v])=>[k,Number(v).toFixed(2)]));
     }

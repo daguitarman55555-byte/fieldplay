@@ -6,8 +6,10 @@ export function parseExpression(source) {
   const peek=()=>tokens[cursor]; const take=()=>tokens[cursor++];
   function expression(min=0){
     let left=prefix();
-    while(peek() && peek().type==='op' && precedence(peek().value)>=min){
-      const op=take().value, priority=precedence(op);
+    while(peek()){
+      const implicit=isImplicitFactor(peek()),priority=implicit?2:peek().type==='op'?precedence(peek().value):-1;
+      if(priority<min)break;
+      const op=implicit?'*':take().value;
       const right=expression(priority+(op==='^'?0:1)); left={type:'binary',op,left,right};
     }
     return left;
@@ -30,6 +32,8 @@ export function parseExpression(source) {
   function expect(type,value){const token=take();if(!token||token.type!==type||token.value!==value)throw syntax(`Expected ${value}`);}
   const ast=expression(); if(peek()) throw syntax(`Unexpected token: ${peek().value}`); return ast;
 }
+
+function isImplicitFactor(token){return token?.type==='number'||token?.type==='name'||(token?.type==='paren'&&token.value==='(');}
 
 export function compileExpression(source, parameters = {}) {
   const ast=parseExpression(source);

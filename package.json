@@ -16,6 +16,7 @@
     "ccapture.js": "1.0.7",
     "codemirror": "^5.65.0",
     "glsl-parser": "git+https://github.com/anvaka/glslx.git#glsl-parser",
+    "mathlive": "^0.110.0",
     "ngraph.events": "0.0.4",
     "panzoom": "^9.2.5",
     "query-state": "^4.0.0",

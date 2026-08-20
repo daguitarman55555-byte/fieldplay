@@ -2,8 +2,10 @@ export function createViewportTransform(bbox, canvasRect) {
   const width=canvasRect.width, height=canvasRect.height;
   const sx=width/(bbox.maxX-bbox.minX), sy=height/(bbox.maxY-bbox.minY);
   return {
-    point(x,y){return [canvasRect.left+(x-bbox.minX)*sx,canvasRect.top+(bbox.maxY-y)*sy];},
-    vector(vx,vy){return [vx*sx,-vy*sy];}
+    // FieldPlay's particle shader maps minY to the top of the canvas. Match
+    // that renderer convention exactly so diagnostic arrows follow trails.
+    point(x,y){return [canvasRect.left+(x-bbox.minX)*sx,canvasRect.top+(y-bbox.minY)*sy];},
+    vector(vx,vy){return [vx*sx,vy*sy];}
   };
 }
 
