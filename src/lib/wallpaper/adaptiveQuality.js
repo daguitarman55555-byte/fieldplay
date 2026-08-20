@@ -10,10 +10,10 @@ export function initialParticleCount(quality, maxParticles) {
   return clamp(requested || 35000, 5000, maxParticles);
 }
 
-export function getNextParticleCount({ current, averageFps, maxParticles, quality = 'auto' }) {
+export function getNextParticleCount({ current, averageFps, frameTimeP90, maxParticles, quality = 'auto' }) {
   if (quality !== 'auto' || !Number.isFinite(averageFps)) return current;
-  if (averageFps < 42) return clamp(Math.floor(current * 0.8), 12000, maxParticles);
-  if (averageFps > 57) return clamp(Math.ceil(current * 1.15), 12000, maxParticles);
+  if (averageFps < 42 || frameTimeP90 > 24) return clamp(Math.floor(current * 0.8), 8000, maxParticles);
+  if (averageFps > 57 && (!Number.isFinite(frameTimeP90) || frameTimeP90 < 18)) return clamp(Math.ceil(current * 1.12), 8000, maxParticles);
   return current;
 }
 
@@ -28,23 +28,26 @@ export function createAdaptiveQuality({ scene, quality, maxParticles, onChange }
     if (lastFrame) {
       const elapsed = time - lastFrame;
       if (elapsed > 0 && elapsed < 1000) {
-        samples.push(1000 / elapsed);
+        samples.push(elapsed);
         if (samples.length > 180) samples.shift();
       }
     }
     lastFrame = time;
 
     if (samples.length < 90 || time - lastAdjustment < 5000) return;
-    averageFps = samples.reduce((sum, value) => sum + value, 0) / samples.length;
+    const averageFrameTime=samples.reduce((sum,value)=>sum+value,0)/samples.length;
+    averageFps=1000/averageFrameTime;
+    const sorted=[...samples].sort((a,b)=>a-b),frameTimeP90=sorted[Math.floor((sorted.length-1)*.9)];
     const next = getNextParticleCount({
       current: scene.getParticlesCount(),
       averageFps,
+      frameTimeP90,
       maxParticles,
       quality
     });
     if (next !== scene.getParticlesCount()) {
       scene.setParticlesCount(next, { persist: false });
-      onChange && onChange(next, averageFps);
+      onChange && onChange(next, averageFps, { frameTimeP90 });
     }
     lastAdjustment = time;
     samples = [];

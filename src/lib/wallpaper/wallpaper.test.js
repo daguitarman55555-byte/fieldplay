@@ -47,8 +47,10 @@ describe('curated fields', () => {
 describe('quality and recovery', () => {
   it('adjusts auto quality only outside sustained target thresholds', () => {
     expect(getNextParticleCount({ current: 35000, averageFps: 41, maxParticles: 70000 })).toBe(28000);
-    expect(getNextParticleCount({ current: 35000, averageFps: 58, maxParticles: 70000 })).toBe(40250);
+    expect(getNextParticleCount({ current: 35000, averageFps: 58, maxParticles: 70000 })).toBe(39201);
     expect(getNextParticleCount({ current: 35000, averageFps: 52, maxParticles: 70000 })).toBe(35000);
+    expect(getNextParticleCount({ current: 35000, averageFps: 58, frameTimeP90: 27, maxParticles: 70000 })).toBe(28000);
+    expect(getNextParticleCount({ current: 35000, averageFps: 58, frameTimeP90: 17, maxParticles: 70000 })).toBe(39201);
     expect(getNextParticleCount({ current: 45000, averageFps: 20, maxParticles: 70000, quality: 'high' })).toBe(45000);
   });
 

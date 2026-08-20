@@ -32,6 +32,8 @@ function initVectorFieldApp(canvas) {
     scene.start();
     window.scene = scene;
     window.fieldPlayBridge = installFieldPlayBridge(scene);
+    const embedOrigin = new URLSearchParams(location.search).get('embedOrigin');
+    if (embedOrigin) window.disconnectFieldPlayMessaging = window.fieldPlayBridge.connectMessaging({ allowedOrigins: [embedOrigin] });
     const wallpaperOptions = parseWallpaperOptions();
     if (wallpaperOptions.enabled) {
       document.body.classList.add('wallpaper-mode');

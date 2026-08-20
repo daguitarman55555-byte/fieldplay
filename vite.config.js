@@ -10,5 +10,9 @@ export default defineConfig({
   },
   server: { port: 8880, open: true },
   base: './',
-  build: { outDir: 'dist', sourcemap: true }
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    rollupOptions: { output: { manualChunks: { mathlive: ['mathlive'] } } }
+  }
 })
