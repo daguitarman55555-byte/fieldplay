@@ -4,14 +4,15 @@ export function parseDesmosVectorField(latex){
   const normalized=normalizeDesmosLatex(latex),equal=findTopLevel(normalized,'=');
   if(equal<0)return null;
   const left=normalized.slice(0,equal),right=normalized.slice(equal+1),signature=/^([A-Za-z](?:_[A-Za-z0-9]+)?)\(x,y\)$/.exec(left);
-  if(!signature||right[0]!=='('||right.at(-1)!==')')return null;
+  const delimiters=right[0]==='('&&right.at(-1)===')'||right[0]==='<'&&right.at(-1)==='>';
+  if(!signature||!delimiters)return null;
   const components=splitTopLevel(right.slice(1,-1),',');
   if(components.length!==2||components.some(x=>!x.trim()))return null;
   return{name:signature[1],x:components[0],y:components[1],source:latex};
 }
 
 export function normalizeDesmosLatex(latex){
-  let value=String(latex||'').replace(/\\left|\\right/g,'').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
+  let value=String(latex||'').replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
   value=value.replace(/\\operatorname\{([A-Za-z]+)\}/g,'$1');
   FUNCTIONS.forEach(name=>{value=value.replace(new RegExp(`\\\\${name}\\b`,'g'),name);});
   value=value.replace(/\\pi/g,'pi').replace(/\\theta/g,'theta').replace(/\^\{([^{}]+)\}/g,'^($1)').replace(/_\{([^{}]+)\}/g,'_$1');
