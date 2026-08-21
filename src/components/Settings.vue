@@ -16,7 +16,7 @@
       </div>
       <syntax v-if='syntaxHelpVisible' @close='syntaxHelpVisible = false'></syntax>
       <details class='function-database'><summary>Function reference ({{functionDatabase.length}})</summary><p class='function-list'>{{functionDatabase.join(', ')}}</p><dl><template v-for='(description,name) in functionHelp' :key='name'><dt>{{name}}</dt><dd>{{description}}</dd></template></dl><p>Variables: x, y, r, theta, t. Constants: π/pi, e, tau, phi, sqrt2, ln2, ln10.</p></details>
-      <details class='advanced-code' open><summary>Developer mode — advanced GLSL</summary>
+      <details class='advanced-code'><summary>Developer mode — advanced GLSL</summary>
       <code-editor :model='vectorField'></code-editor>
       </details>
       <details class='preset-library' open><summary>Field preset gallery ({{presets.length}})</summary>
@@ -34,7 +34,7 @@
       <Inputs :vm='inputsModel'></Inputs>
     </div>
     <form id='visual-layers' class='block panel-section' @submit.prevent='onSubmit'>
-      <div class='title'>Appearance and analysis<a class='reset-all' href='?' title='set default settings'>reset all</a> </div>
+      <div class='title'>Visualization<a class='reset-all' href='?' title='set default settings'>reset all</a> </div>
       <div class='row'>
         <div class='col'>Particle color</div>
         <div class='col'> 
@@ -189,19 +189,13 @@
       </div>
     </form>
     <details id='projects' class='project-panel panel-section' open>
-      <summary class='title'>Projects and history</summary>
-      <div class='history-buttons'><button @click='undo'>Undo</button><button @click='redo'>Redo</button><button @click='downloadPNG'>PNG</button><button @click='downloadSVG'>SVG</button></div>
+      <summary class='title'>Projects, history and export</summary>
+      <div class='history-buttons'><button @click='undo'>Undo</button><button @click='redo'>Redo</button><select aria-label='Export or share' @change='runExport'><option value=''>Export…</option><option value='png'>PNG image</option><option value='svg'>SVG vectors</option><option value='json'>Project JSON</option><option value='link'>Copy share link</option></select></div>
       <div class='save-project'><input v-model='projectName' placeholder='Project name'><button @click='saveCurrentProject'>Save</button></div>
       <div class='saved-project' v-for='project in savedProjects' :key='project.name'><span>{{project.name}}</span><button @click='loadProject(project)'>Load</button><button @click='compareProject(project)'>Compare</button><button @click='removeProject(project.name)'>×</button></div>
       <label class='import-project'>Import project JSON<input type='file' accept='.json,application/json' @change='importProject'></label>
       <button v-if='comparisonActive' @click='clearComparison'>Clear comparison</button>
       <label v-if='comparisonActive'>Comparison <select v-model='overlay.compareMode' @change='publishOverlay'><option value='overlay'>Overlay</option><option value='difference'>Difference</option><option value='split'>Split view</option></select></label>
-    </details>
-    <details class='export-panel panel-section' open>
-      <summary class='title'>Share and export</summary>
-      <p>The current field and viewport already live in the URL. Copy it to share an exact scene.</p>
-      <button @click='copyShareLink'>{{copyLabel}}</button>
-      <button @click='downloadState'>Download state JSON</button>
       <div class='bridge-note'><b>Embedding API ready</b><br><code>window.FieldPlay</code> exposes field, gradient, viewport, and subscription controls for a future Desmos overlay.</div>
     </details>
     <div v-if='commandOpen' class='command-backdrop' @click.self='commandOpen=false'><div class='command-palette'><input ref='commandSearch' v-model='commandSearch' placeholder='Type a command…' @keydown.esc='commandOpen=false'><button v-for='command in filteredCommands' :key='command.label' @click='runCommand(command)'><span>{{command.label}}</span><kbd>{{command.key||''}}</kbd></button></div></div>
@@ -225,6 +219,7 @@ import { PALETTE_OPTIONS, paletteGradient, particlePaletteShader, setCustomGradi
 import { STUDIO_PRESETS } from '../lib/studioPresets.js';
 import { createAdaptiveQuality } from '../lib/wallpaper/adaptiveQuality.js';
 import { createHistory, deleteProject, listProjects, saveProject } from '../lib/studioProjects.js';
+import { generateRandomField } from '../lib/randomFieldGenerator.js';
 
 // Temporary disable this until API is finished.
 const soundAvailable = config.isAudioEnabled;
@@ -265,7 +260,6 @@ export default {
     return {
       presets: STUDIO_PRESETS,
       presetSearch: '',
-      copyLabel: 'Copy share link',
       scalarExpression: 'sin(x) * cos(y)',
       xExpression: '0.1*y',
       yExpression: '-0.2*y',
@@ -368,7 +362,7 @@ export default {
       const cx=preset.center?.[0]||0, cy=preset.center?.[1]||0, half=preset.bounds/2;
       this.scene.applyBoundingBox({minX:cx-half,maxX:cx+half,minY:cy-half,maxY:cy+half});
     },
-    randomizeStudioField(){const preset=this.presets[Math.floor(Math.random()*this.presets.length)];this.applyPreset(preset);},
+    async randomizeStudioField(){let generated;do{generated=generateRandomField();}while(generated.signature===this.lastRandomSignature);this.lastRandomSignature=generated.signature;this.xExpression=generated.x;this.yExpression=generated.y;this.parameterText='';this.functionDefinitions='';this.projectName=generated.name;await this.applyMathField();const half=generated.bounds/2;this.scene.applyBoundingBox({minX:-half,maxX:half,minY:-half,maxY:half});},
     async applyMathField() {
       try { const parameters=parseParameters(this.parameterText);this.parameterValues={...parameters};const model=compileVectorField(this.xExpression,this.yExpression,parameters,this.functionDefinitions);const result=await this.vectorField.setCode(model.code);if(result?.error)throw new Error(result.error.error||result.error.message||'Shader compilation failed');this.mathError='';this.mathWarnings=[...new Set(model.warnings)];this.currentModel=model;bus.fire('studio-field-model',model);if(!this.restoring)this.history.push(this.projectSnapshot());this.persistStudioState();return model; } catch(error){this.mathError=error.message||String(error);return null;}
     },
@@ -382,6 +376,7 @@ export default {
     clearTrajectories(){bus.fire('studio-clear-trajectories');},
     runCommand(command){this.commandOpen=false;this.commandSearch='';command.action();},
     downloadSVG(){bus.fire('studio-export-svg');},
+    runExport(event){const action=event.target.value;event.target.value='';if(action==='png')this.downloadPNG();else if(action==='svg')this.downloadSVG();else if(action==='json')this.downloadState();else if(action==='link')this.copyShareLink();},
     applySimulation(){this.scene.setIntegrator(this.integrator);this.scene.setSpeedMultiplier(this.speedMultiplier);this.queuePersist();},
     applyPerformanceProfile(){const profiles={eco:{particles:12000,integrator:'midpoint',density:14},balanced:{particles:25000,integrator:'rk4',density:22},detail:{particles:50000,integrator:'rk4',density:30}},profile=profiles[this.performanceProfile];if(!profile)return;this.particlesCount=profile.particles;this.integrator=profile.integrator;this.overlay.arrowDensity=profile.density;this.applySimulation();this.publishOverlay();},
     applySpawn(){this.scene.setSeed(this.seed);this.scene.setSpawnMode(this.spawnMode);this.persistStudioState();},
@@ -406,7 +401,6 @@ export default {
     downloadPNG(){const canvases=[...document.querySelectorAll('canvas')];const out=document.createElement('canvas');out.width=innerWidth*(devicePixelRatio||1);out.height=innerHeight*(devicePixelRatio||1);const ctx=out.getContext('2d');ctx.scale(devicePixelRatio||1,devicePixelRatio||1);canvases.forEach(canvas=>ctx.drawImage(canvas,parseFloat(canvas.style.left)||0,parseFloat(canvas.style.top)||0,innerWidth,innerHeight));const link=document.createElement('a');link.download='fieldplay.png';link.href=out.toDataURL('image/png');link.click();},
     async copyShareLink() {
       await navigator.clipboard.writeText(location.href);
-      this.copyLabel='Copied'; setTimeout(()=>this.copyLabel='Copy share link',1200);
     },
     downloadState() {
       const blob=new Blob([JSON.stringify(this.projectSnapshot(),null,2)],{type:'application/json'});
@@ -530,14 +524,11 @@ help-background = rgb(7, 12, 23);
 .preset-library summary,.function-database summary { cursor:pointer;color:#9ab6d2;font-size:12px; }
 .preset-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:12px; }
 .preset-card{display:grid;grid-template-columns:1fr 28px}.preset-card .favorite{padding:0;color:#ffd65d}
-.preset-grid button, .export-panel button { padding:8px 5px; border:1px solid #294563; background:#071526; color:#9ec8ed; cursor:pointer; }
-.preset-grid button:hover, .export-panel button:hover { border-color:#42aaf5; color:white; }
-.export-panel { color:#9ab6d2; }
-.export-panel p { font-size:13px; line-height:1.5; }
-.export-panel>button { width:100%; margin:0 0 8px; }
+.preset-grid button { padding:8px 5px; border:1px solid #294563; background:#071526; color:#9ec8ed; cursor:pointer; }
+.preset-grid button:hover { border-color:#42aaf5; color:white; }
 .bridge-note { margin-top:14px; padding:12px; border-left:2px solid #42aaf5; background:#061121; font-size:12px; line-height:1.6; }
 .project-panel { margin:14px 0;color:#9ab6d2; }
-.project-panel button,.project-panel input { padding:7px;border:1px solid #294563;background:#071526;color:#dcecff; }
+.project-panel button,.project-panel input,.project-panel select { padding:7px;border:1px solid #294563;background:#071526;color:#dcecff; }
 .history-buttons { display:grid;grid-template-columns:repeat(3,1fr);gap:6px; }
 .save-project { display:grid;grid-template-columns:1fr auto;gap:6px;margin:8px 0; }
 .saved-project { display:grid;grid-template-columns:1fr auto auto 28px;gap:4px;align-items:center;margin-top:4px;font-size:12px; }
