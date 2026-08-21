@@ -2,6 +2,7 @@ export function notationTemplate(latex){
   if(endsCommand(latex,'mtx'))return{latex:`${latex.slice(0,-3)}\\left[\\left[0,0\\right],\\left[0,0\\right]\\right]`,left:3,matrix:true};
   let match=/(.*)\\frac\{d\}\{d([A-Za-z])\}$/.exec(latex);if(match)return{latex:`${match[1]}\\frac{d}{d${match[2]}}\\left(\\right)`,left:1};
   match=/(.*)\\frac\{\\partial\}\{\\partial ([A-Za-z])\}$/.exec(latex);if(match)return{latex:`${match[1]}\\frac{\\partial}{\\partial ${match[2]}}\\left(\\right)`,left:1};
+  match=/(.*)\\frac\{\\partial\}\{(?:p|\\partial )?d([A-Za-z])\}$/.exec(latex);if(match)return{latex:`${match[1]}\\frac{\\partial}{\\partial ${match[2]}}\\left(\\right)`,left:1};
   match=/(.*)\\frac\{d\^\{([^{}]+)\}\}\{d([A-Za-z])\^\{\2\}\}$/.exec(latex);if(match)return{latex:`${match[1]}\\frac{d^{${match[2]}}}{d${match[3]}^{${match[2]}}}\\left(\\right)`,left:1};
   match=/(.*)\\frac\{pd\}\{pd([A-Za-z])\}$/.exec(latex);if(match)return{latex:`${match[1]}\\frac{\\partial}{\\partial ${match[2]}}\\left(\\right)`,left:1};
   match=/(.*)\\frac\{pd\^\{([^{}]+)\}([^{}]*)\}\{pd([A-Za-z])\^\{\2\}\}$/.exec(latex);if(match)return{latex:`${match[1]}\\frac{\\partial^{${match[2]}}${match[3]}}{\\partial ${match[4]}^{${match[2]}}}`,left:0};

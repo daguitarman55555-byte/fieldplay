@@ -3,6 +3,7 @@ describe('natural calculus notation templates',()=>{
   it('adds editable ordinary derivative arguments',()=>{expect(notationTemplate('\\frac{d}{dx}')).toEqual({latex:'\\frac{d}{dx}\\left(\\right)',left:1});expect(notationTemplate('\\frac{d^{3}}{dz^{3}}').latex).toContain('d^{3}');});
   it('turns pd shorthand into partial notation',()=>expect(notationTemplate('\\frac{pd}{pdy}').latex).toBe('\\frac{\\partial}{\\partial y}\\left(\\right)'));
   it('completes an already progressively formatted partial',()=>expect(notationTemplate('\\frac{\\partial}{\\partial x}').latex).toBe('\\frac{\\partial}{\\partial x}\\left(\\right)'));
+  it('completes a partial after pd has already become the symbol',()=>expect(notationTemplate('\\frac{\\partial}{pdx}').latex).toBe('\\frac{\\partial}{\\partial x}\\left(\\right)'));
   it('formats mixed higher partials',()=>expect(notationTemplate('\\frac{pd^{2}T}{pdxpdy}').latex).toBe('\\frac{\\partial^{2}T}{\\partial x\\partial y}'));
   it('creates indefinite and bounded integral structures',()=>{expect(notationTemplate('int').latex).toBe('\\int\\left(\\right)\\,dx');expect(notationTemplate('intb').latex).toContain('\\int_{ }^{ }');expect(notationTemplate('tripleint').latex).toContain('\\iiint');});
   it('formats vector-calculus operators',()=>{expect(notationTemplate('grad').latex).toBe('\\nabla\\left(\\right)');expect(notationTemplate('div').latex).toContain('\\nabla\\cdot');});
