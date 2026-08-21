@@ -5,6 +5,8 @@ Early Chrome extension implementation for enhanced Desmos notation and vector-ca
 ## Current milestone
 
 - Detects native point-valued definitions such as `F(x,y)=(-y,x)` in the Desmos equation list.
+- Runs FieldPlay-style particles directly on the GPU with velocity-sensitive RK4 integration, randomized recycling, color palettes, and fading trails.
+- Keeps vector arrows, particles, and contours independently toggleable from a compact in-graph menu.
 - Renders a synchronized vector-arrow canvas above the 2D graph.
 - Keeps the Desmos expression panel and graph interactions unobstructed.
 - Type `vec`, a space, and a letter to insert arrow notation such as `\\vec{a}` in the active equation field. The same shortcut works for `hat` and `bar`.
