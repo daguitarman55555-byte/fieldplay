@@ -1,0 +1,7 @@
+import{describe,expect,it}from'vitest';import{parseEnhancedSyntax}from'./enhancedSyntax.js';import{normalizeDesmosLatex,parseDesmosVectorField}from'./desmosLatex.js';
+describe('enhanced Desmos syntax',()=>{
+  it('parses vectors and vector fields',()=>{expect(parseEnhancedSyntax('vec a = <2,3>')).toMatchObject({kind:'vector',name:'a',components:['2','3']});expect(parseEnhancedSyntax('vec F(x,y) = <-y,x>')).toMatchObject({kind:'vector-field',variables:['x','y']});});
+  it('parses calculus notation',()=>{expect(parseEnhancedSyntax('partial x y f(x,y)')).toMatchObject({kind:'partial',variables:['x','y']});expect(parseEnhancedSyntax('d n x f(x)')).toMatchObject({kind:'derivative',order:'n'});expect(parseEnhancedSyntax('grad f(x,y)')).toMatchObject({kind:'grad'});expect(parseEnhancedSyntax("y'=x-y")).toMatchObject({kind:'slope-field'});});
+  it('reads native point-valued Desmos functions as fields',()=>{expect(parseDesmosVectorField('F\\left(x,y\\right)=\\left(-y,x\\right)')).toMatchObject({name:'F',x:'-y',y:'x'});expect(parseDesmosVectorField('f(x)=x')).toBeNull();});
+  it('normalizes common Desmos latex',()=>expect(normalizeDesmosLatex('\\frac{x}{2}+\\sin\\left(y\\right)')).toBe('((x)/(2))+sin(y)'));
+});

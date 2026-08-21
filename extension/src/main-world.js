@@ -1,0 +1,7 @@
+const CHANNEL='fieldplay-desmos';let pendingAccent=null,lastSnapshot='';
+
+boot();
+function boot(){if(!window.Calc){setTimeout(boot,100);return;}emitState();window.Calc.observeEvent?.('change',scheduleState);window.Calc.observe?.('graphpaperBounds',scheduleState);window.addEventListener('keydown',onKeyDown,true);window.postMessage({channel:CHANNEL,type:'ready'},location.origin);}
+function scheduleState(){clearTimeout(scheduleState.timer);scheduleState.timer=setTimeout(emitState,25);}
+function emitState(){const bounds=window.Calc.graphpaperBounds,expressions=window.Calc.getExpressions?.()||[],snapshot=JSON.stringify([bounds,expressions.map(x=>[x.id,x.latex,x.hidden])]);if(snapshot===lastSnapshot)return;lastSnapshot=snapshot;window.postMessage({channel:CHANNEL,type:'state',payload:{mode:location.pathname.startsWith('/3d')?'3d':'2d',bounds,expressions:expressions.map(({id,latex,hidden,color})=>({id,latex,hidden,color}))}},location.origin);}
+function onKeyDown(event){const focused=window.Calc.focusedMathQuill?.mq;if(!focused)return;if(pendingAccent){if(/^[A-Za-z]$/.test(event.key)){focused.latex(`${pendingAccent.base}\\${pendingAccent.command}{${event.key}}`);focused.focus();event.preventDefault();event.stopImmediatePropagation();}pendingAccent=null;return;}if(event.key!==' ')return;const latex=focused.latex(),match=/(?:^|[^A-Za-z])(vec|hat|bar)$/.exec(latex);if(!match)return;pendingAccent={base:latex.slice(0,-match[1].length),command:match[1]};event.preventDefault();event.stopImmediatePropagation();}

@@ -1,6 +1,7 @@
 .DS_Store
 node_modules/
 dist/
+extension/dist/
 .npm-cache/
 lively-package/
 npm-debug.log*
