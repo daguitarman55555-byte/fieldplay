@@ -1,0 +1,21 @@
+FIELDPLAY FOR DESMOS - ONE-TIME SETUP
+
+1. Move this entire "FieldPlay for Desmos" folder somewhere permanent,
+   such as your Documents folder. Do not load it directly from Downloads.
+
+2. Open Chrome and enter this address:
+   chrome://extensions
+
+3. Turn on Developer mode in the upper-right corner.
+
+4. Click Load unpacked.
+
+5. Select the "extension" folder beside this file.
+
+UPDATING LATER
+
+Double-click "Update FieldPlay.cmd".
+When Chrome's Extensions page opens, click the circular Reload button on
+FieldPlay for Desmos. Refresh any open Desmos tab.
+
+You do not need PowerShell, npm, or another ZIP for future updates.
