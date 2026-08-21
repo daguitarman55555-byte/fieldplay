@@ -1,0 +1,32 @@
+name: Build Chrome extension
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/desmos-extension
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:extension
+      - name: Package extension
+        working-directory: extension/dist
+        run: zip -r ../fieldplay-desmos.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fieldplay-desmos-extension
+          path: extension/fieldplay-desmos.zip

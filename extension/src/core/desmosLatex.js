@@ -1,0 +1,43 @@
+const FUNCTIONS=['sin','cos','tan','arcsin','arccos','arctan','sinh','cosh','tanh','sqrt','abs','exp','ln','log'];
+
+export function parseDesmosVectorField(latex){
+  const normalized=normalizeDesmosLatex(latex),equal=findTopLevel(normalized,'=');
+  if(equal<0)return null;
+  const left=normalized.slice(0,equal),right=normalized.slice(equal+1),functionSignature=/^([A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)?)\(x,y\)$/.exec(left),vectorSignature=/^vec\(([A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)?)\)$/.exec(left),signature=functionSignature||vectorSignature;
+  if(!signature)return null;
+  const body=vectorBody(right);if(body===null)return null;
+  const components=splitTopLevel(body,',');
+  if(components.length!==2||components.some(x=>!x.trim()))return null;
+  return{name:signature[1],x:expandDesmosProducts(components[0]),y:expandDesmosProducts(components[1]),source:latex};
+}
+
+export function parseDesmosSlopeField(latex){const normalized=normalizeDesmosLatex(latex),equal=findTopLevel(normalized,'=');if(equal<0)return null;const left=normalized.slice(0,equal).replace(/[()*]/g,''),right=normalized.slice(equal+1);if(left!=="y'"&&left!=='yprime'&&left!=='dy/dx'||!right)return null;return{name:'dy/dx',x:'1',y:expandDesmosProducts(right),source:latex,kind:'slope-field'};}
+
+export function parseDesmosGradient(latex){const normalized=normalizeDesmosLatex(latex);if(!normalized.startsWith('grad'))return null;const body=normalized.slice(4),equal=findTopLevel(body,'=');if(!body)return null;if(equal<0)return{name:'f',expression:expandDesmosProducts(body),source:latex,kind:'gradient'};const name=body.slice(0,equal),expression=body.slice(equal+1);if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)||!expression)return null;return{name,expression:expandDesmosProducts(expression),source:latex,kind:'gradient'};}
+
+export function parseDesmosFieldQuantity(latex){const normalized=normalizeDesmosLatex(latex),match=/^(div|curl|magnitude)\(?([A-Za-z][A-Za-z0-9_]*)\)?$/.exec(normalized);if(!match)return null;return{kind:'field-quantity',quantity:match[1],fieldName:match[2],source:latex};}
+
+export function parseDesmosTransform(latex){const normalized=normalizeDesmosLatex(latex),equal=findTopLevel(normalized,'=');if(equal<0)return null;const left=normalized.slice(0,equal),match=/^transform([A-Za-z][A-Za-z0-9_]*)\(x,y\)$/.exec(left);if(!match)return null;const body=vectorBody(normalized.slice(equal+1));if(body===null)return null;const components=splitTopLevel(body,',');if(components.length!==2||components.some(value=>!value.trim()))return null;return{name:match[1],x:expandDesmosProducts(components[0]),y:expandDesmosProducts(components[1]),source:latex,kind:'transform'};}
+
+export function parseDesmosContour(latex){const normalized=normalizeDesmosLatex(latex);if(!normalized.startsWith('contour'))return null;const body=normalized.slice(7),equal=findTopLevel(body,'=');if(!body)return null;if(equal<0)return{name:'f',expression:expandDesmosProducts(body),source:latex,kind:'contour'};const name=body.slice(0,equal),expression=body.slice(equal+1);if(!/^[A-Za-z]$/.test(name)||!expression)return null;return{name,expression:expandDesmosProducts(expression),source:latex,kind:'contour'};}
+
+export function parseDesmosParameter(latex){const normalized=normalizeDesmosLatex(latex),match=/^([A-Za-z])=(.+)$/.exec(normalized);if(!match||match[1]==='x'||match[1]==='y')return null;return{name:match[1],expression:expandDesmosProducts(match[2])};}
+
+export function normalizeDesmosLatex(latex){
+  let value=String(latex||'').replace(/\^\{?\\prime\}?/g,"'").replace(/\\prime/g,'prime').replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\nabla\\cdot/g,'div').replace(/\\nabla\\times/g,'curl').replace(/\\nabla/g,'grad').replace(/\\partial/g,'partial').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
+  value=value.replace(/\\(?:vec|overrightarrow)\{([^{}]+)\}/g,'vec($1)');
+  value=value.replace(/\\operatorname\{([A-Za-z]+)\}/g,'$1');
+  FUNCTIONS.forEach(name=>{value=value.replace(new RegExp(`\\\\${name}\\b`,'g'),name);});
+  value=value.replace(/\\pi/g,'pi').replace(/\\theta/g,'theta').replace(/\^\{([^{}]+)\}/g,'^($1)').replace(/_\{([^{}]+)\}/g,'_$1');
+  for(let pass=0;pass<8&&value.includes('\\frac');pass++)value=replaceFirstFraction(value);
+  value=value.replace(/\{/g,'(').replace(/\}/g,')').replace(/([xy])(?=[xy])/g,'$1*').replace(/([xy)])(?=(?:sin|cos|tan|arcsin|arccos|arctan|sinh|cosh|tanh|sqrt|abs|exp|ln|log)\()/g,'$1*').replace(/([xy])(?=(?:pi|theta)\b)/g,'$1*').replace(/(?:pi|theta)(?=[xy])/g,'$&*');
+  return value;
+}
+
+function vectorBody(right){if(right.startsWith('<<'))return right.endsWith('>>')?right.slice(2,-2):right.slice(2);if(right[0]==='('&&right.at(-1)===')'||right[0]==='<'&&right.at(-1)==='>')return right.slice(1,-1);return null;}
+function expandDesmosProducts(value){const known=new Set([...FUNCTIONS,'pi','theta','tau','phi']);return String(value).replace(/[A-Za-z]+/g,word=>known.has(word.toLowerCase())?word:word.split('').join('*'));}
+
+export function splitTopLevel(value,separator){const result=[];let depth=0,start=0;for(let i=0;i<value.length;i++){const c=value[i];if(c==='('||c==='['||c==='{')depth++;else if(c===')'||c===']'||c==='}')depth--;else if(c===separator&&depth===0){result.push(value.slice(start,i));start=i+1;}}result.push(value.slice(start));return result;}
+function findTopLevel(value,target){let depth=0;for(let i=0;i<value.length;i++){const c=value[i];if(c==='('||c==='['||c==='{')depth++;else if(c===')'||c===']'||c==='}')depth--;else if(c===target&&depth===0)return i;}return-1;}
+function replaceFirstFraction(value){const start=value.indexOf('\\frac');if(start<0)return value;const numerator=groupAt(value,start+5);if(!numerator)return value.replace('\\frac','');const denominator=groupAt(value,numerator.end);if(!denominator)return value.replace('\\frac','');return value.slice(0,start)+`((${numerator.text})/(${denominator.text}))`+value.slice(denominator.end);}
+function groupAt(value,index){if(value[index]!=='{')return null;let depth=0;for(let i=index;i<value.length;i++){if(value[i]==='{')depth++;else if(value[i]==='}'&&--depth===0)return{text:value.slice(index+1,i),end:i+1};}return null;}

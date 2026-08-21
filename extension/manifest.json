@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "FieldPlay for Desmos",
+  "version": "0.9.6",
+  "description": "Advanced vector calculus notation and overlays for the Desmos calculators.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.desmos.com/calculator*", "https://www.desmos.com/3d*"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.desmos.com/calculator*", "https://www.desmos.com/3d*"],
+      "js": ["main-world.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://www.desmos.com/calculator*", "https://www.desmos.com/3d*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_title": "FieldPlay for Desmos" }
+}
