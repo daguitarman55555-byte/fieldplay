@@ -1,6 +1,6 @@
 export function parseEnhancedSyntax(source){
   const text=String(source||'').trim();if(!text)return null;let match;
-  if((match=/^(?:vec|vector)\s+([A-Za-z]\w*)(?:\(([^)]*)\))?\s*=\s*<(.+)>$/i.exec(text))){const components=split(match[3]);return{kind:match[2]?'vector-field':'vector',name:match[1],variables:split(match[2]||''),components,latex:`\\vec{${match[1]}}${match[2]?`(${match[2]})`:''}=\\left\\langle ${components.join(',')}\\right\\rangle`};}
+  if((match=/^(?:vec|vector)\s+([A-Za-z]\w*)(?:\(([^)]*)\))?\s*=\s*(?:<<|<)(.+?)(?:>>|>)?$/i.exec(text))){const components=split(match[3]);return{kind:match[2]?'vector-field':'vector',name:match[1],variables:split(match[2]||''),components,latex:`\\vec{${match[1]}}${match[2]?`(${match[2]})`:''}=\\left\\langle ${components.join(',')}\\right\\rangle`};}
   if((match=/^(?:slope\s+)?y'\s*=\s*(.+)$/i.exec(text)))return{kind:'slope-field',dependent:'y',expression:match[1],latex:`y'=${match[1]}`};
   if((match=/^partial\s+((?:[A-Za-z]\s+)+)(.+)$/i.exec(text))){const variables=match[1].trim().split(/\s+/);return{kind:'partial',variables,expression:match[2],latex:partialLatex(variables,match[2])};}
   if((match=/^d\s+(\d+|[A-Za-z]\w*)\s+([A-Za-z])\s+(.+)$/i.exec(text)))return{kind:'derivative',order:match[1],variable:match[2],expression:match[3],latex:`\\frac{d^{${match[1]}}}{d${match[2]}^{${match[1]}}}\\left(${match[3]}\\right)`};
