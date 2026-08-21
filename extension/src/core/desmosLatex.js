@@ -15,12 +15,16 @@ export function parseDesmosSlopeField(latex){const normalized=normalizeDesmosLat
 
 export function parseDesmosGradient(latex){const normalized=normalizeDesmosLatex(latex);if(!normalized.startsWith('grad'))return null;const body=normalized.slice(4),equal=findTopLevel(body,'=');if(!body)return null;if(equal<0)return{name:'f',expression:expandDesmosProducts(body),source:latex,kind:'gradient'};const name=body.slice(0,equal),expression=body.slice(equal+1);if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)||!expression)return null;return{name,expression:expandDesmosProducts(expression),source:latex,kind:'gradient'};}
 
+export function parseDesmosFieldQuantity(latex){const normalized=normalizeDesmosLatex(latex),match=/^(div|curl|magnitude)\(?([A-Za-z][A-Za-z0-9_]*)\)?$/.exec(normalized);if(!match)return null;return{kind:'field-quantity',quantity:match[1],fieldName:match[2],source:latex};}
+
+export function parseDesmosTransform(latex){const normalized=normalizeDesmosLatex(latex),equal=findTopLevel(normalized,'=');if(equal<0)return null;const left=normalized.slice(0,equal),match=/^transform([A-Za-z][A-Za-z0-9_]*)\(x,y\)$/.exec(left);if(!match)return null;const body=vectorBody(normalized.slice(equal+1));if(body===null)return null;const components=splitTopLevel(body,',');if(components.length!==2||components.some(value=>!value.trim()))return null;return{name:match[1],x:expandDesmosProducts(components[0]),y:expandDesmosProducts(components[1]),source:latex,kind:'transform'};}
+
 export function parseDesmosContour(latex){const normalized=normalizeDesmosLatex(latex);if(!normalized.startsWith('contour'))return null;const body=normalized.slice(7),equal=findTopLevel(body,'=');if(!body)return null;if(equal<0)return{name:'f',expression:expandDesmosProducts(body),source:latex,kind:'contour'};const name=body.slice(0,equal),expression=body.slice(equal+1);if(!/^[A-Za-z]$/.test(name)||!expression)return null;return{name,expression:expandDesmosProducts(expression),source:latex,kind:'contour'};}
 
 export function parseDesmosParameter(latex){const normalized=normalizeDesmosLatex(latex),match=/^([A-Za-z])=(.+)$/.exec(normalized);if(!match||match[1]==='x'||match[1]==='y')return null;return{name:match[1],expression:expandDesmosProducts(match[2])};}
 
 export function normalizeDesmosLatex(latex){
-  let value=String(latex||'').replace(/\^\{\\prime\}/g,"'").replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\nabla/g,'grad').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
+  let value=String(latex||'').replace(/\^\{\\prime\}/g,"'").replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\nabla\\cdot/g,'div').replace(/\\nabla\\times/g,'curl').replace(/\\nabla/g,'grad').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
   value=value.replace(/\\(?:vec|overrightarrow)\{([^{}]+)\}/g,'vec($1)');
   value=value.replace(/\\operatorname\{([A-Za-z]+)\}/g,'$1');
   FUNCTIONS.forEach(name=>{value=value.replace(new RegExp(`\\\\${name}\\b`,'g'),name);});
