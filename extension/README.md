@@ -15,16 +15,21 @@ Early Chrome extension implementation for enhanced Desmos notation and vector-ca
 
 ## Symbolic commands
 
-For the common operations, type the short word and press Space. FieldPlay creates the parentheses and puts the cursor inside. Enter the math and press Enter:
+Use ordinary mathematical shorthand. FieldPlay converts a recognized token as soon as it becomes complete and places the cursor in the next editable position. Space is also accepted as a fallback:
 
-- `diff` — derivative with respect to x
-- `ddx` / `ddy` — derivative with respect to x or y
-- `px` / `py` — partial derivative with respect to x or y
-- `int` — antiderivative with respect to x
-- `simp` — simplify
-- `solve` — solve for x
+- `d/dx` and `d/dy` create ordinary derivative operators.
+- `d^n/dx^n` creates an nth-derivative operator.
+- `pd/pdx` and `pd/pdy` create partial-derivative operators using `∂`.
+- `int` creates an indefinite integral with an integrand and `dx`.
+- Clicking an existing integral symbol opens a compact choice to add or remove bounds without changing its integrand or differential.
+- `intb` remains available as a direct bounded-integral shortcut.
+- `iint`, `iiint`, `lineint`, `surfaceint`, and `oint` create correctly formatted multiple, line, surface, and closed integrals.
+- Add `b` to `iint` or `iiint` for editable bounds.
+- `grad`, `div`, `curl`, `laplacian`, and `magnitude` create their conventional mathematical operators with an editable argument.
 
-Examples: `diff` Space, type `x^3`, Enter; or `solve` Space, type `x^2-5x+6=0`, Enter.
+If a target is already present—such as `d^3T/dz^3`—FieldPlay preserves the complete notation instead of adding another argument.
+
+The earlier `diff`, `ddx`, `ddy`, `px`, `py`, `simp`, and `solve` forms remain compatible for existing users.
 
 Advanced forms remain available when a different variable or derivative order is needed:
 
