@@ -15,7 +15,18 @@ Early Chrome extension implementation for enhanced Desmos notation and vector-ca
 
 ## Symbolic commands
 
-Type a command directly into a Desmos equation row and press Enter:
+For the common operations, type the short word and press Space. FieldPlay creates the parentheses and puts the cursor inside. Enter the math and press Enter:
+
+- `diff` — derivative with respect to x
+- `ddx` / `ddy` — derivative with respect to x or y
+- `px` / `py` — partial derivative with respect to x or y
+- `int` — antiderivative with respect to x
+- `simp` — simplify
+- `solve` — solve for x
+
+Examples: `diff` Space, type `x^3`, Enter; or `solve` Space, type `x^2-5x+6=0`, Enter.
+
+Advanced forms remain available when a different variable or derivative order is needed:
 
 - `simplify(expression)`
 - `differentiate(x, expression)`
