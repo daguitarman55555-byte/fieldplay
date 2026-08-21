@@ -15,7 +15,7 @@ export function parseDesmosSlopeField(latex){const normalized=normalizeDesmosLat
 
 export function normalizeDesmosLatex(latex){
   let value=String(latex||'').replace(/\^\{\\prime\}/g,"'").replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
-  value=value.replace(/\\vec\{([^{}]+)\}/g,'vec($1)');
+  value=value.replace(/\\(?:vec|overrightarrow)\{([^{}]+)\}/g,'vec($1)');
   value=value.replace(/\\operatorname\{([A-Za-z]+)\}/g,'$1');
   FUNCTIONS.forEach(name=>{value=value.replace(new RegExp(`\\\\${name}\\b`,'g'),name);});
   value=value.replace(/\\pi/g,'pi').replace(/\\theta/g,'theta').replace(/\^\{([^{}]+)\}/g,'^($1)').replace(/_\{([^{}]+)\}/g,'_$1');
