@@ -13,6 +13,8 @@ export function parseDesmosVectorField(latex){
 
 export function parseDesmosSlopeField(latex){const normalized=normalizeDesmosLatex(latex),match=/^y'=(.+)$/.exec(normalized);if(!match||!match[1])return null;return{name:'dy/dx',x:'1',y:match[1],source:latex,kind:'slope-field'};}
 
+export function parseDesmosContour(latex){const normalized=normalizeDesmosLatex(latex);if(!normalized.startsWith('contour'))return null;const body=normalized.slice(7),equal=findTopLevel(body,'=');if(!body)return null;if(equal<0)return{name:'f',expression:body,source:latex,kind:'contour'};const name=body.slice(0,equal),expression=body.slice(equal+1);if(!/^[A-Za-z]$/.test(name)||!expression)return null;return{name,expression,source:latex,kind:'contour'};}
+
 export function normalizeDesmosLatex(latex){
   let value=String(latex||'').replace(/\^\{\\prime\}/g,"'").replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
   value=value.replace(/\\(?:vec|overrightarrow)\{([^{}]+)\}/g,'vec($1)');
