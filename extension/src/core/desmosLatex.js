@@ -11,7 +11,7 @@ export function parseDesmosVectorField(latex){
   return{name:signature[1],x:expandDesmosProducts(components[0]),y:expandDesmosProducts(components[1]),source:latex};
 }
 
-export function parseDesmosSlopeField(latex){const normalized=normalizeDesmosLatex(latex),match=/^y'=(.+)$/.exec(normalized);if(!match||!match[1])return null;return{name:'dy/dx',x:'1',y:expandDesmosProducts(match[1]),source:latex,kind:'slope-field'};}
+export function parseDesmosSlopeField(latex){const normalized=normalizeDesmosLatex(latex),equal=findTopLevel(normalized,'=');if(equal<0)return null;const left=normalized.slice(0,equal).replace(/[()*]/g,''),right=normalized.slice(equal+1);if(left!=="y'"&&left!=='yprime'&&left!=='dy/dx'||!right)return null;return{name:'dy/dx',x:'1',y:expandDesmosProducts(right),source:latex,kind:'slope-field'};}
 
 export function parseDesmosGradient(latex){const normalized=normalizeDesmosLatex(latex);if(!normalized.startsWith('grad'))return null;const body=normalized.slice(4),equal=findTopLevel(body,'=');if(!body)return null;if(equal<0)return{name:'f',expression:expandDesmosProducts(body),source:latex,kind:'gradient'};const name=body.slice(0,equal),expression=body.slice(equal+1);if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)||!expression)return null;return{name,expression:expandDesmosProducts(expression),source:latex,kind:'gradient'};}
 
@@ -24,7 +24,7 @@ export function parseDesmosContour(latex){const normalized=normalizeDesmosLatex(
 export function parseDesmosParameter(latex){const normalized=normalizeDesmosLatex(latex),match=/^([A-Za-z])=(.+)$/.exec(normalized);if(!match||match[1]==='x'||match[1]==='y')return null;return{name:match[1],expression:expandDesmosProducts(match[2])};}
 
 export function normalizeDesmosLatex(latex){
-  let value=String(latex||'').replace(/\^\{\\prime\}/g,"'").replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\nabla\\cdot/g,'div').replace(/\\nabla\\times/g,'curl').replace(/\\nabla/g,'grad').replace(/\\partial/g,'partial').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
+  let value=String(latex||'').replace(/\^\{?\\prime\}?/g,"'").replace(/\\prime/g,'prime').replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\nabla\\cdot/g,'div').replace(/\\nabla\\times/g,'curl').replace(/\\nabla/g,'grad').replace(/\\partial/g,'partial').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
   value=value.replace(/\\(?:vec|overrightarrow)\{([^{}]+)\}/g,'vec($1)');
   value=value.replace(/\\operatorname\{([A-Za-z]+)\}/g,'$1');
   FUNCTIONS.forEach(name=>{value=value.replace(new RegExp(`\\\\${name}\\b`,'g'),name);});
