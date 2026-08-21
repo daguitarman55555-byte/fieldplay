@@ -13,6 +13,20 @@ Early Chrome extension implementation for enhanced Desmos notation and vector-ca
 - Click the FieldPlay status button or press `Alt+V` to toggle the overlay.
 - Includes a tested parser for planned `vec`, slope-field, derivative, partial, gradient, divergence, curl, Jacobian, Hessian, Laplacian and integral syntax.
 
+## Symbolic commands
+
+Type a command directly into a Desmos equation row and press Enter:
+
+- `simplify(expression)`
+- `differentiate(x, expression)`
+- `derivative(x, n, expression)` for an nth derivative
+- `d(x, n, expression)` to render the literal `dⁿ/dxⁿ` operator notation
+- `partial(x, y, expression)` for successive partial derivatives
+- `integrate(x, expression)` for a supported elementary antiderivative
+- `solve(x, equation)` for linear and quadratic polynomial equations
+
+The extension replaces the command with its rendered mathematical result. Unsupported symbolic operations are left unchanged rather than returning an unreliable answer.
+
 ## Build
 
 From the repository root:

@@ -24,7 +24,7 @@ export function parseDesmosContour(latex){const normalized=normalizeDesmosLatex(
 export function parseDesmosParameter(latex){const normalized=normalizeDesmosLatex(latex),match=/^([A-Za-z])=(.+)$/.exec(normalized);if(!match||match[1]==='x'||match[1]==='y')return null;return{name:match[1],expression:expandDesmosProducts(match[2])};}
 
 export function normalizeDesmosLatex(latex){
-  let value=String(latex||'').replace(/\^\{\\prime\}/g,"'").replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\nabla\\cdot/g,'div').replace(/\\nabla\\times/g,'curl').replace(/\\nabla/g,'grad').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
+  let value=String(latex||'').replace(/\^\{\\prime\}/g,"'").replace(/\\left|\\right/g,'').replace(/\\langle/g,'<').replace(/\\rangle/g,'>').replace(/\\nabla\\cdot/g,'div').replace(/\\nabla\\times/g,'curl').replace(/\\nabla/g,'grad').replace(/\\partial/g,'partial').replace(/\\cdot|\\times/g,'*').replace(/\\,/g,'').replace(/\s+/g,'');
   value=value.replace(/\\(?:vec|overrightarrow)\{([^{}]+)\}/g,'vec($1)');
   value=value.replace(/\\operatorname\{([A-Za-z]+)\}/g,'$1');
   FUNCTIONS.forEach(name=>{value=value.replace(new RegExp(`\\\\${name}\\b`,'g'),name);});
